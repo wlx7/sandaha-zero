@@ -22,14 +22,18 @@ WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
 
 
 def lan_addresses():
+    """LAN IPv4 addresses, the one on the default route first."""
+    primary = None
+    for probe in ("8.8.8.8", "10.255.255.255"):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect((probe, 80))  # UDP connect sends nothing; it just picks the route
+            primary = s.getsockname()[0]
+            s.close()
+            break
+        except OSError:
+            continue
     ips = set()
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("10.255.255.255", 1))
-        ips.add(s.getsockname()[0])
-        s.close()
-    except OSError:
-        pass
     try:
         for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
             ip = info[4][0]
@@ -37,7 +41,16 @@ def lan_addresses():
                 ips.add(ip)
     except OSError:
         pass
-    return sorted(ips)
+    if primary and not primary.startswith("127."):
+        ips.add(primary)
+
+    def rank(ip):
+        # virtual adapters (VMware, WSL, VPN/TUN) usually own the .1 address of their subnet
+        virtual = ip.endswith(".1")
+        home = ip.startswith("192.168.") or ip.startswith("10.")
+        return (virtual, not home, ip != primary, ip)
+
+    return sorted(ips, key=rank)
 
 
 class Client:
