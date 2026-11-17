@@ -202,7 +202,7 @@ def train(cfg, run_dir, log=print):
         if init_model.meta.get("arch"):
             arch = init_model.meta["arch"]  # warm start keeps the checkpoint's architecture
     elif cfg.init_from:
-        arch = torch.load(cfg.init_from, map_location="cpu").get("arch", arch)
+        arch = torch.load(cfg.init_from, map_location="cpu", weights_only=False).get("arch", arch)
     net = SanDaHaNet(arch).to(device)
     games_offset = 0
     if cfg.init_from:
@@ -210,7 +210,7 @@ def train(cfg, run_dir, log=print):
             net.load_numpy(init_model.params)
             games_offset = int(init_model.meta.get("games", 0))
         else:
-            sd = torch.load(cfg.init_from, map_location=device)
+            sd = torch.load(cfg.init_from, map_location=device, weights_only=False)
             net.load_state_dict(sd["net"])
             games_offset = int(sd.get("games", 0))
         log(f"warm start from {cfg.init_from} ({games_offset} games)")
