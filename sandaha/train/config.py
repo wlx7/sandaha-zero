@@ -13,6 +13,7 @@ class TrainConfig:
     aux_hidden: list = field(default_factory=lambda: [256, 128])
     num_actors: int = 0                 # 0 = auto (cpu_count - 2)
     device: str = "auto"                # auto / cpu / cuda
+    learner_threads: int = 0            # torch threads for a CPU learner (0 = auto)
     lr: float = 3e-4
     batch_size: int = 1024
     buffer_size: int = 300_000          # play samples kept in replay (others scaled)

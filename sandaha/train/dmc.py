@@ -192,6 +192,8 @@ def train(cfg, run_dir, log=print):
     else:
         device = cfg.device
     torch.manual_seed(cfg.seed)
+    if device == "cpu":
+        torch.set_num_threads(cfg.learner_threads or max(2, min(8, (os.cpu_count() or 8) // 4)))
     arch = cfg.arch()
     net = SanDaHaNet(arch).to(device)
     games_offset = 0
