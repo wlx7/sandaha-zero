@@ -21,8 +21,8 @@ class TrainConfig:
     epsilon_start: float = 0.10
     epsilon_end: float = 0.01
     epsilon_decay_games: int = 300_000
-    max_games: int = 2_000_000
-    max_hours: float = 0.0              # 0 = unlimited
+    max_games: int = 0                  # 0 = unlimited (stop by time or manually)
+    max_hours: float = 3.0              # 0 = unlimited
     export_every: int = 50              # learner steps between weight pushes to actors
     eval_every_minutes: float = 10.0
     eval_deals: int = 200               # duplicate deals (x2 games) per evaluation
