@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Train on a RunPod (or any Linux GPU) machine.
+# Train on a RunPod / Vast.ai / any Linux machine (GPU optional).
 #   bash scripts/runpod_train.sh <run-name> [preset] [hours] [extra cli args...]
 # Uses the PyTorch already present in the RunPod pytorch image.
 # Results land in /workspace/sandaha-zero/runs/<run-name>; a tiny HTTP server on
@@ -9,12 +9,13 @@ NAME=${1:-runpod}
 PRESET=${2:-medium}
 HOURS=${3:-3}
 shift 3 || true
-cd /workspace
+cd "${WORKDIR:-/workspace}" 2>/dev/null || cd "$HOME"
 if [ ! -d sandaha-zero ]; then
   git clone --depth 1 https://github.com/wlx7/sandaha-zero.git
 fi
 cd sandaha-zero
 git pull --ff-only || true
+python -c "import torch" 2>/dev/null || python -m pip install -q torch
 python -m pip install -q --upgrade numpy fastapi "uvicorn[standard]" segno
 python -m pip install -q -e . --no-deps
 mkdir -p runs
