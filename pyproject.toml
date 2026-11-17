@@ -1,0 +1,35 @@
+[project]
+name = "sandaha-zero"
+version = "1.0.0"
+description = "三打哈 (Hunan San Da Ha) AI: deep Monte-Carlo self-play, web client with LAN play, teaching mode and training dashboard"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "segno>=1.6",
+]
+
+[project.optional-dependencies]
+# PyTorch is only needed for training. The web UI can install it on demand.
+train = ["torch>=2.1"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+sandaha = "sandaha.launcher:main"
+sandaha-train = "sandaha.train.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sandaha*"]
+
+[tool.setuptools.package-data]
+sandaha = ["web/**/*"]
+
+[tool.uv]
+package = true

@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+runs/*
+!runs/.gitkeep
+models/*.tmp.npz
+models/sandaha-dev.npz
+runs_*.log
+*.log
+.DS_Store
+.claude/
+uv.lock
