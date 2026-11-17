@@ -81,7 +81,7 @@ class Room:
         if kind == "ai":
             seat.kind, seat.client_id = "ai", None
             seat.agent_spec = spec.get("model") or "rule"
-            seat.name = registry.agent_label(seat.agent_spec)
+            seat.name = f"{registry.agent_label(seat.agent_spec)}·{i + 1}"
             seat.agent = registry.make_agent(seat.agent_spec, seed=random.randrange(1 << 30))
         elif kind == "human" and spec.get("client_id"):
             seat.kind, seat.client_id = "human", spec["client_id"]
@@ -134,6 +134,8 @@ class Room:
             return
         if g.over:
             self._finish_hand()
+            if all(x.kind == "ai" for x in self.seats):
+                self._task = asyncio.create_task(self._auto_next(self.hand_no))
             await self.broadcast()
             return
         seat = self.seats[g.to_act]
@@ -193,6 +195,16 @@ class Room:
         except asyncio.CancelledError:
             pass
 
+    async def _auto_next(self, hand_no):
+        """All-AI rooms (spectating) continue on their own."""
+        try:
+            await asyncio.sleep(4 + self.ai_delay * 3)
+            async with self.lock:
+                if self.hand_no == hand_no and self.status == "hand_over" and self.members:
+                    await self.start_hand()
+        except asyncio.CancelledError:
+            pass
+
     async def _timeout(self, deadline):
         try:
             await asyncio.sleep(max(0, deadline - time.time()))
@@ -207,6 +219,8 @@ class Room:
                         g.step(rng.choice(g.legal_actions()))
                 else:
                     acts = g.legal_actions()
+                    if g.phase == BID and PASS in acts:
+                        acts = [PASS]  # an expired bid counts as 不叫
                     if g.phase == TRUMP and len(acts) > 1:
                         acts = [a for a in acts if a != SURRENDER]
                     g.step(rng.choice(acts))

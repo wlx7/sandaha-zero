@@ -18,7 +18,7 @@ git pull --ff-only || true
 python -m pip install -q --upgrade numpy fastapi "uvicorn[standard]" segno
 python -m pip install -q -e . --no-deps
 mkdir -p runs
-nohup python -m sandaha.train.cli train --name "$NAME" --preset "$PRESET" --hours "$HOURS" "$@" \
+nohup python -u -m sandaha.train.cli train --name "$NAME" --preset "$PRESET" --hours "$HOURS" "$@" \
   > "runs/$NAME.log" 2>&1 &
 echo "training started: runs/$NAME (log: runs/$NAME.log)"
 if ! pgrep -f "http.server 8000" >/dev/null; then

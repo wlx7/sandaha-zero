@@ -259,6 +259,11 @@ async def handle(client: Client, msg: dict):
     room = hub.rooms.get(client.room_id) if client.room_id else None
     if op == "list_rooms":
         await client.send({"op": "rooms", "rooms": hub.room_list()})
+    elif op == "sync":
+        if room:
+            await client.send(room.view(client.id))
+        else:
+            await client.send({"op": "rooms", "rooms": hub.room_list()})
     elif op == "create_room":
         if room:
             await leave(client, room)

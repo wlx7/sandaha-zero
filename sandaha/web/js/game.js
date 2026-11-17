@@ -34,11 +34,11 @@ export function mountPlay(app) {
     }
   }));
   offs.push(on('hint', (m) => showHint(m.comment)));
-  offs.push(on('welcome', () => send({ op: 'list_rooms' })));
+  offs.push(on('welcome', () => send({ op: 'sync' })));
   offs.push(on('close', () => { /* reconnect handled by net */ }));
 
   api('/api/models').then((r) => { st.models = r.models; st.defaultModel = r.default; if (!st.view || !st.view.room) render(); }).catch(() => {});
-  send({ op: 'list_rooms' });
+  send({ op: 'sync' });
 
   const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(render, 120); };
   window.addEventListener('resize', onResize);
