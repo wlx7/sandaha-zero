@@ -138,6 +138,15 @@ def _game_batch(g, record):
             for phase, (S, A, T) in by_phase.items()}
 
 
+def _merge_batches(batches):
+    out = {}
+    for b in batches:
+        for phase, arrs in b.items():
+            out.setdefault(phase, []).append(arrs)
+    return {phase: tuple(np.concatenate([a[k] for a in lst]) for k in range(3))
+            for phase, lst in out.items()}
+
+
 def _batched_actor(cfg, rules, rules_ns, rng, latest, ver_path, q, stop_event, games_counter):
     """Play ``games_per_actor`` hands side by side and evaluate all pending
     decisions of the same phase in one network pass.  Every forward pass then
@@ -201,18 +210,26 @@ def _batched_actor(cfg, rules, rules_ns, rng, latest, ver_path, q, stop_event, g
                     records[i].append((s, phase, st, A[j]))
                     games[i].step(acts[j])
             # harvest finished games
+            done = 0
             for i in range(len(games) - 1, -1, -1):
                 if games[i].over:
                     pending.append(_game_batch(games[i], records[i]))
                     del games[i], records[i]
-                    with games_counter.get_lock():
-                        games_counter.value += 1
-            while pending and not stop_event.is_set():
-                try:
-                    q.put(pending[0], timeout=0.5)
-                    pending.pop(0)
-                except queue_mod.Full:
-                    break
+                    done += 1
+            if done:
+                with games_counter.get_lock():
+                    games_counter.value += done
+            # ship many games per message: per-message overhead, not bytes,
+            # is what limits the learner's intake on slow cores
+            if len(pending) >= cfg.send_games:
+                merged = _merge_batches(pending)
+                while not stop_event.is_set():
+                    try:
+                        q.put(merged, timeout=0.5)
+                        break
+                    except queue_mod.Full:
+                        continue
+                pending = []
     except KeyboardInterrupt:
         pass
 
