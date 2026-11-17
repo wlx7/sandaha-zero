@@ -35,5 +35,5 @@
   "loss_win_weight": 0.3,
   "loss_pts_weight": 0.3,
   "rules": {},
-  "note": "Official medium model: RunPod CPU pod 0-0.46M games, Vast.ai 0.35M-14.2M games (constant LR until 3.68M, cosine decay after)."
+  "note": "Official medium model: RunPod CPU pod 0-0.46M games, Vast.ai 0.35M-14.2M games (constant LR until 3.68M, cosine decay after); continued on Vast.ai 14.2M-53.7M games with batched actors (a-medium-2/3/4; final 4 h run: cosine LR 1e-4 -> 1e-5, batch 2048, ~2,900 games/s)."
 }

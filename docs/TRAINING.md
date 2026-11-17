@@ -13,6 +13,7 @@
 |---|---|---|
 | preset | medium | tiny / small / medium / large / xlarge (see below) |
 | num_actors | 0 (= CPU threads − 2) | **The main speed factor**: training is bound by CPU self-play |
+| games_per_actor / send_games | 8 / 16 | Each actor plays several games at once and evaluates their decisions in one batched pass. Finished hands go to the learner in bundles. Raise games_per_actor (e.g. 32) on many-core machines, where memory bandwidth is the limit |
 | device | auto | Learner on GPU or CPU (`learner_threads` for CPU) |
 | lr / batch_size | 3e-4 / 1024 | Use batch 512 for a CPU learner |
 | replay_ratio | 2.0 | Average number of times each sample is used; 0.5 for a CPU learner |
@@ -57,10 +58,10 @@ bash scripts/runpod_train.sh main medium 3 --actors 30
 
 ### Vast.ai / other clouds
 
-The script is plain Linux and has nothing RunPod-specific. Choose a PyTorch image with **as many CPU threads as possible**. A 128-thread EPYC + RTX 3070 on Vast.ai reached ≈1,450 games/s, more than 6× the 32-vCPU RunPod pod.
+The script is plain Linux and has nothing RunPod-specific. Choose a PyTorch image with **as many CPU threads as possible**. A 128-thread EPYC + RTX 3070 on Vast.ai reached ≈2,900 games/s with batched actors, more than 12× the 32-vCPU RunPod pod. Without batching it peaked at ≈490–1,450 games/s, and adding processes made it slower because of memory bandwidth.
 
 ```bash
-bash scripts/runpod_train.sh main medium 3 --actors 110 --batch 1024 --replay 1.0
+bash scripts/runpod_train.sh main medium 3 --actors 116 --games-per-actor 32 --batch 2048 --replay 0.75
 ```
 
 Expose `http://localhost:8000` (tunnel or port mapping) to download results. Resume after an interruption with `--init runs/<name>/latest.pt`.

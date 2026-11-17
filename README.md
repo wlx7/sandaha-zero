@@ -92,21 +92,38 @@ Each size trained for **45 minutes** on a laptop (20 threads, 14 self-play worke
 
 Head-to-head (800 games each): small beats medium **69.2%**, small beats large **67.2%**, and medium beats large **56.8%**.
 
-With limited compute, **data, not capacity, is the bottleneck**, so smaller networks win. With a 128-thread Vast.ai machine, medium was trained to 14.2M games and then beat small 60.9%. medium is therefore the default (`models/sandaha-best.npz`), and small ships as a lightweight option (`models/sandaha-lite.npz`).
+With limited compute, **data, not capacity, is the bottleneck**, so smaller networks win. With a 128-thread Vast.ai machine, medium was trained to 53.7M games and then beat small 62.0%. medium is therefore the default (`models/sandaha-best.npz`), and small ships as a lightweight option (`models/sandaha-lite.npz`).
 
 ### Results
 
-**Training** (≈14.2M self-play games in total; the full curves are in the dashboard under `official`):
+**Training** (≈53.7M self-play games in total; the full curves are in the dashboard under `official`):
 
 | Stage | Machine | Games | Win rate vs rule AI |
 |---|---|---|---|
 | 1 | RunPod 32-vCPU CPU pod ($1.12/h, ~40 min) | 0 → 0.46M | 72.2% |
 | 2 | Vast.ai 128 threads + RTX 3070, constant LR | 0.35M → 3.68M | 74–75% (plateau) |
-| 3 | same, cosine LR decay 3e-4 → 2e-5 for 2 h | 3.68M → 14.2M | **76.1%**, **+2.13** per game |
+| 3 | same, cosine LR decay 3e-4 → 2e-5 for 2 h | 3.68M → 14.2M | 76.1%, +2.13 per game |
+| 4 | Vast.ai 128-thread EPYC 7B12, batched actors (~2,900 games/s), cosine LR 1e-4 → 1e-5, ~4.5 h | 14.2M → 53.7M | **76–78%**, **+2.2** per game |
 
-The learning-rate decay broke the plateau. With a constant LR, the 3.68M model was even (50.0%) against the 2.35M model. After the decay, the final model beats the 2.35M model 57.1%.
+The learning-rate decay broke the plateau. With a constant LR, the 3.68M model was even (50.0%) against the 2.35M model. After the decay, the 14.2M model beats the 2.35M model 57.1%.
 
-**Final benchmark** (`scripts/benchmark.py`; each row is 486 deals × seat swap = 972 games; ± is a 95% CI):
+Stage 4 first fixed self-play throughput. On many-core machines every actor process streamed its own copy of the weights for each decision, so memory bandwidth, not compute, was the limit. Adding more processes made things slower. Each actor now plays 32 games at once and evaluates all their decisions in one batched network pass, and finished hands are sent to the learner in bundles. Together these raised throughput on the same machine from ≈490 to ≈2,900 games/s (`games_per_actor`, `send_games`). Gains have now flattened out: the final model is only even (49.8%) against its own 43.2M checkpoint.
+
+**Final benchmark** (`scripts/benchmark.py`; each row is 6,000 deals × seat swap = 12,000 games; ± is a 95% CI):
+
+| Opponent | Win rate | Net score / game | Our banker rate | Banker win rate |
+|---|---|---|---|---|
+| Rule-based AI | **75.4% ± 0.8** | **+2.09** | 18.7% | 72.1% |
+| Random | 99.9% ± 0.1 | +5.62 | 0.6% | — |
+| Previous release (14.2M games) | 52.4% ± 0.9 | +0.14 | 50.3% | 52.4% |
+| Same run @ 16.0M | 52.8% ± 0.9 | +0.17 | 50.9% | 52.6% |
+| Same run @ 29.2M | 50.9% ± 0.9 | +0.08 | 51.2% | 51.0% |
+| Same run @ 43.2M | 49.8% ± 0.9 | −0.02 | 50.5% | 49.7% |
+| small / lite (405k) | 62.0% ± 0.9 | +0.99 | 52.4% | 62.4% |
+
+On the same 6,000 deals, the previous release (14.2M games) scored 74.8% / +2.06 against the rule AI.
+
+<details><summary>Previous release benchmark (14.2M games, 972 games per row)</summary>
 
 | Opponent | Win rate | Net score / game | Our banker rate | Banker win rate |
 |---|---|---|---|---|
@@ -118,9 +135,11 @@ The learning-rate decay broke the plateau. With a constant LR, the 3.68M model w
 | Old: Vast (5.0M) | 52.5% ± 3.1 | +0.18 | 52.8% | 52.4% |
 | small / lite (405k) | 60.9% ± 3.1 | +0.85 | 52.9% | 61.5% |
 
+</details>
+
 Notes:
 - **Win rate** is the share of games where our two seats' combined score is positive. 三打哈 is 1-vs-3 and individual hands are very luck-dependent. The duplicate format (the same deal replayed with seats swapped) cancels most of the luck.
-- Against the rule AI, our AI is rarely the banker (18%). The rule AI bids aggressively, and our AI learned to let it take the contract and profit as a defender. When our AI is the banker, it wins 75% of the time.
+- Against the rule AI, our AI is rarely the banker (18%). The rule AI bids aggressively, and our AI learned to let it take the contract and profit as a defender. When our AI is the banker, it wins 72–75% of the time.
 - The AI learned to **surrender** bad banker hands. With a contract ≥ 55, surrender settles as an ordinary loss (−3) and avoids 小倒/大倒 (−6/−9).
 
 **Search (optional)**: for card play, the agent takes the network's top-3 moves, rolls each out to the end of the hand under 8 sampled deals consistent with what it has seen, and picks the best average. Against the same model without search, over 1,200 games: +0.15 ± 0.18 per deal. That is a small gain, not yet statistically significant, so search is off by default. Choose "+ 搜索增强" when picking an AI to enable it.

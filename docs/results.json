@@ -1,76 +1,76 @@
 {
- "model": "models/sandaha-best.npz",
- "deals": 500,
+ "model": "runs/a-medium-4/final.npz",
+ "deals": 6000,
  "rows": [
   {
-   "games": 972,
-   "win_rate": 0.7335390946502057,
-   "avg_score": 1.9876543209876543,
-   "banker_rate": 0.18209876543209877,
-   "banker_win_rate": 0.751412429378531,
-   "win_ci95": 0.027794017135740902,
+   "games": 12000,
+   "win_rate": 0.7545,
+   "avg_score": 2.0856666666666666,
+   "banker_rate": 0.187,
+   "banker_win_rate": 0.7205882352941176,
+   "win_ci95": 0.007700533572422109,
    "opponent": "规则AI rule",
-   "seconds": 5.3
+   "seconds": 11.7
   },
   {
-   "games": 972,
-   "win_rate": 0.9979423868312757,
-   "avg_score": 5.61522633744856,
-   "banker_rate": 0.006172839506172839,
-   "banker_win_rate": 0.6666666666666666,
-   "win_ci95": 0.002848770995321696,
+   "games": 12000,
+   "win_rate": 0.99925,
+   "avg_score": 5.620333333333333,
+   "banker_rate": 0.005666666666666667,
+   "banker_win_rate": 0.8676470588235294,
+   "win_ci95": 0.0004898162155339583,
    "opponent": "随机 random",
-   "seconds": 5.5
+   "seconds": 12.5
   },
   {
-   "games": 972,
-   "win_rate": 0.5246913580246914,
-   "avg_score": 0.17695473251028807,
-   "banker_rate": 0.5277777777777778,
-   "banker_win_rate": 0.5243664717348928,
-   "win_ci95": 0.031395163548530794,
-   "opponent": "checkpoints/ckpt_005012626.npz",
-   "seconds": 7.0
+   "games": 12000,
+   "win_rate": 0.5279166666666667,
+   "avg_score": 0.169,
+   "banker_rate": 0.5091666666666667,
+   "banker_win_rate": 0.5260229132569558,
+   "win_ci95": 0.008932180054858243,
+   "opponent": "旧版本 @16011k 局",
+   "seconds": 18.4
   },
   {
-   "games": 972,
-   "win_rate": 0.5349794238683128,
-   "avg_score": 0.3004115226337449,
-   "banker_rate": 0.529835390946502,
-   "banker_win_rate": 0.5553398058252427,
-   "win_ci95": 0.031356498718364136,
-   "opponent": "checkpoints/ckpt_002346189.npz",
-   "seconds": 7.6
+   "games": 12000,
+   "win_rate": 0.5091666666666667,
+   "avg_score": 0.07666666666666666,
+   "banker_rate": 0.51175,
+   "banker_win_rate": 0.5103403354502524,
+   "win_ci95": 0.008944631531859808,
+   "opponent": "旧版本 @29151k 局",
+   "seconds": 17.2
   },
   {
-   "games": 972,
-   "win_rate": 0.573045267489712,
-   "avg_score": 0.5617283950617284,
-   "banker_rate": 0.5360082304526749,
-   "banker_win_rate": 0.5547024952015355,
-   "win_ci95": 0.03109627153341574,
-   "opponent": "main-medium/final.npz",
-   "seconds": 7.5
+   "games": 12000,
+   "win_rate": 0.4980833333333333,
+   "avg_score": -0.014833333333333334,
+   "banker_rate": 0.5054166666666666,
+   "banker_win_rate": 0.4971145919208574,
+   "win_ci95": 0.008946069376433594,
+   "opponent": "旧版本 @43211k 局",
+   "seconds": 21.8
   },
   {
-   "games": 972,
-   "win_rate": 0.7469135802469136,
-   "avg_score": 1.4320987654320987,
-   "banker_rate": 0.5339506172839507,
-   "banker_win_rate": 0.6608863198458574,
-   "win_ci95": 0.027333329569980226,
-   "opponent": "local1/final.npz",
-   "seconds": 6.5
+   "games": 12000,
+   "win_rate": 0.5240833333333333,
+   "avg_score": 0.13766666666666666,
+   "banker_rate": 0.50275,
+   "banker_win_rate": 0.5244488645781535,
+   "win_ci95": 0.008935751438846755,
+   "opponent": "models/sandaha-best.npz",
+   "seconds": 16.7
   },
   {
-   "games": 972,
-   "win_rate": 0.6090534979423868,
-   "avg_score": 0.8539094650205762,
-   "banker_rate": 0.5288065843621399,
-   "banker_win_rate": 0.6147859922178989,
-   "win_ci95": 0.03067674848615364,
-   "opponent": "local-small/final.npz",
-   "seconds": 8.3
+   "games": 12000,
+   "win_rate": 0.6195833333333334,
+   "avg_score": 0.9896666666666667,
+   "banker_rate": 0.52375,
+   "banker_win_rate": 0.6235481304693715,
+   "win_ci95": 0.008686505113563392,
+   "opponent": "models/sandaha-lite.npz",
+   "seconds": 15.6
   }
  ]
 }

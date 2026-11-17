@@ -13,6 +13,7 @@
 |---|---|---|
 | 模型大小 | medium | tiny/small/medium/large/xlarge，见下表。越大越强，但自对弈越慢 |
 | 自对弈进程数 | 0（自动 = CPU 线程数 − 2） | **最重要的速度因素**。训练瓶颈在 CPU 自对弈 |
+| games_per_actor / send_games | 8 / 16 | 每个进程同时进行多局，决策合并成一次批量网络计算；打完的牌局打包发给学习器。多核机器的瓶颈在内存带宽，可调到 32 |
 | 设备 | 自动 | 学习器使用 GPU 或 CPU。没有 GPU 时 CPU 也能训练，学习器线程见 `learner_threads` |
 | 学习率 | 3e-4 | Adam |
 | 批大小 | 1024 | CPU 学习器建议 512 |
@@ -67,11 +68,11 @@ bash scripts/runpod_train.sh main medium 3 --actors 30
 
 ### Vast.ai / AutoDL 等其它云
 
-脚本是通用 Linux 脚本，不依赖 RunPod。选 PyTorch 镜像，**优先选 CPU 线程多的机器**（实测 Vast.ai 上 128 线程 EPYC + RTX 3070 达到约 1,450 局/秒，是 32 vCPU RunPod CPU Pod 的 6 倍以上）：
+脚本是通用 Linux 脚本，不依赖 RunPod。选 PyTorch 镜像，**优先选 CPU 线程多的机器**（实测 Vast.ai 上 128 线程 EPYC + RTX 3070 开启批量自对弈后约 2,900 局/秒，是 32 vCPU RunPod CPU Pod 的 12 倍以上；不开批量时最高只有约 490–1,450 局/秒，而且受内存带宽限制，进程越多反而越慢）：
 
 ```bash
 git clone https://github.com/wlx7/sandaha-zero.git && cd sandaha-zero
-bash scripts/runpod_train.sh main medium 3 --actors 110 --batch 1024 --replay 1.0
+bash scripts/runpod_train.sh main medium 3 --actors 116 --games-per-actor 32 --batch 2048 --replay 0.75
 ```
 
 下载结果：为 `http://localhost:8000` 开一个 HTTP 隧道 / 端口映射即可。中断后可用 `--init runs/<名称>/latest.pt` 接着训练。
