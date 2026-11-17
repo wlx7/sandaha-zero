@@ -26,6 +26,9 @@ def _agent(spec, seed):
         return RuleBot(seed=seed)
     if spec == "random":
         return RandomBot(seed=seed)
+    if spec.endswith("?search"):
+        from sandaha.ai.search import SearchAgent
+        return SearchAgent(Model.load(spec[:-7]), seed=seed)
     return AIAgent(Model.load(spec))
 
 

@@ -204,7 +204,7 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 @keyframes flyLeft { from { transform: translateX(-70px) scale(.7); opacity: 0; } }
 @keyframes flyRight { from { transform: translateX(70px) scale(.7); opacity: 0; } }
 @keyframes flyMe { from { transform: translateY(70px) scale(.8); opacity: 0; } }
-.done-trick { opacity: .82; }
+.done-trick { opacity: .93; }
 
 .hand-area { grid-area: hand; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
 .actions { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; min-height: 40px; }

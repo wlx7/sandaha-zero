@@ -1,0 +1,76 @@
+{
+ "model": "models/sandaha-best.npz",
+ "deals": 500,
+ "rows": [
+  {
+   "games": 972,
+   "win_rate": 0.7335390946502057,
+   "avg_score": 1.9876543209876543,
+   "banker_rate": 0.18209876543209877,
+   "banker_win_rate": 0.751412429378531,
+   "win_ci95": 0.027794017135740902,
+   "opponent": "规则AI rule",
+   "seconds": 5.3
+  },
+  {
+   "games": 972,
+   "win_rate": 0.9979423868312757,
+   "avg_score": 5.61522633744856,
+   "banker_rate": 0.006172839506172839,
+   "banker_win_rate": 0.6666666666666666,
+   "win_ci95": 0.002848770995321696,
+   "opponent": "随机 random",
+   "seconds": 5.5
+  },
+  {
+   "games": 972,
+   "win_rate": 0.5246913580246914,
+   "avg_score": 0.17695473251028807,
+   "banker_rate": 0.5277777777777778,
+   "banker_win_rate": 0.5243664717348928,
+   "win_ci95": 0.031395163548530794,
+   "opponent": "checkpoints/ckpt_005012626.npz",
+   "seconds": 7.0
+  },
+  {
+   "games": 972,
+   "win_rate": 0.5349794238683128,
+   "avg_score": 0.3004115226337449,
+   "banker_rate": 0.529835390946502,
+   "banker_win_rate": 0.5553398058252427,
+   "win_ci95": 0.031356498718364136,
+   "opponent": "checkpoints/ckpt_002346189.npz",
+   "seconds": 7.6
+  },
+  {
+   "games": 972,
+   "win_rate": 0.573045267489712,
+   "avg_score": 0.5617283950617284,
+   "banker_rate": 0.5360082304526749,
+   "banker_win_rate": 0.5547024952015355,
+   "win_ci95": 0.03109627153341574,
+   "opponent": "main-medium/final.npz",
+   "seconds": 7.5
+  },
+  {
+   "games": 972,
+   "win_rate": 0.7469135802469136,
+   "avg_score": 1.4320987654320987,
+   "banker_rate": 0.5339506172839507,
+   "banker_win_rate": 0.6608863198458574,
+   "win_ci95": 0.027333329569980226,
+   "opponent": "local1/final.npz",
+   "seconds": 6.5
+  },
+  {
+   "games": 972,
+   "win_rate": 0.6090534979423868,
+   "avg_score": 0.8539094650205762,
+   "banker_rate": 0.5288065843621399,
+   "banker_win_rate": 0.6147859922178989,
+   "win_ci95": 0.03067674848615364,
+   "opponent": "local-small/final.npz",
+   "seconds": 8.3
+  }
+ ]
+}

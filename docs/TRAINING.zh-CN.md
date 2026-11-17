@@ -25,15 +25,15 @@
 
 模型预设（出牌网络 / 其它网络隐层）：
 
-| 预设 | 出牌网络 | 参数量 | 单核自对弈速度* |
+| 预设 | 出牌网络 | 参数量 | 每进程自对弈速度* |
 |---|---|---|---|
 | tiny | 256-256 | 0.44M | 最快 |
-| small | 512-256-256 | 1.0M | ~35 局/秒 |
-| medium | 768-512-256 | 1.6M | ~20 局/秒 |
-| large | 1024-1024-512-256 | 3.5M | ~6 局/秒 |
+| small | 512-256-256 | 1.0M | ~11 局/秒 |
+| medium（默认） | 768-512-256 | 1.6M | ~6 局/秒 |
+| large | 1024-1024-512-256 | 3.5M | ~3 局/秒 |
 | xlarge | 2048-1024-1024-512 | 6.6M | 很慢 |
 
-\* 近似值，取决于 CPU。
+\* 实测：笔记本 14 个进程并行时的单进程速度（含投降等短局），不同 CPU 差异较大。算力有限时推荐 small，算力充足时推荐 medium，详见 README 中的“模型大小选择”。
 
 ## 3. 输出文件
 
@@ -64,6 +64,17 @@ bash scripts/runpod_train.sh main medium 3 --actors 30
 3. 查看进度：`tail -f runs/main/metrics.jsonl`。
 4. 下载模型：脚本会在 8000 端口提供 `runs/` 目录，浏览器访问 `https://<podid>-8000.proxy.runpod.net/main/final.npz` 即可下载。也可以把整个 `runs/main` 目录复制到本地的 `runs/` 下，在训练中心查看完整曲线。
 5. **用完记得停止或删除 Pod**，否则会持续计费。
+
+### Vast.ai / AutoDL 等其它云
+
+脚本是通用 Linux 脚本，不依赖 RunPod。选 PyTorch 镜像，**优先选 CPU 线程多的机器**（实测 Vast.ai 上 128 线程 EPYC + RTX 3070 达到约 1,450 局/秒，是 32 vCPU RunPod CPU Pod 的 6 倍以上）：
+
+```bash
+git clone https://github.com/wlx7/sandaha-zero.git && cd sandaha-zero
+bash scripts/runpod_train.sh main medium 3 --actors 110 --batch 1024 --replay 1.0
+```
+
+下载结果：为 `http://localhost:8000` 开一个 HTTP 隧道 / 端口映射即可。中断后可用 `--init runs/<名称>/latest.pt` 接着训练。
 
 ## 5. 命令行评测
 

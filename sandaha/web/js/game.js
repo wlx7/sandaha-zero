@@ -52,7 +52,10 @@ export function mountPlay(app) {
   // ======================================================== lobby =====
   function modelOptions(selected) {
     const opts = [h('option', { value: 'rule' }, '规则AI (基准)'), h('option', { value: 'random' }, '随机AI')];
-    for (const m of st.models.filter((x) => x.kind !== 'checkpoint')) opts.push(h('option', { value: m.path }, m.label));
+    for (const m of st.models.filter((x) => x.kind !== 'checkpoint')) {
+      opts.push(h('option', { value: m.path }, m.label));
+      opts.push(h('option', { value: m.path + '?search' }, `${m.label} + 搜索增强（更强，稍慢）`));
+    }
     const ck = st.models.filter((x) => x.kind === 'checkpoint').slice(-12);
     if (ck.length) opts.push(h('optgroup', { label: '训练检查点' }, ck.map((m) => h('option', { value: m.path }, m.label))));
     const sel = h('select', {}, opts);

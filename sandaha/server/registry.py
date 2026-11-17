@@ -66,6 +66,7 @@ def default_model_path():
 
 
 def load_model(path) -> Model:
+    path = path[:-7] if path.endswith("?search") else path
     full = path if os.path.isabs(path) else os.path.join(ROOT, path)
     full = os.path.abspath(full)
     if not full.startswith(ROOT) or not full.endswith(".npz"):
@@ -85,6 +86,9 @@ def make_agent(spec: str, seed=None):
         return RuleBot(seed=seed)
     if spec == "random":
         return RandomBot(seed=seed)
+    if spec.endswith("?search"):
+        from ..ai.search import SearchAgent
+        return SearchAgent(load_model(spec[:-7]), seed=seed)
     return AIAgent(load_model(spec), seed=seed)
 
 
@@ -93,4 +97,6 @@ def agent_label(spec: str):
         return "规则AI"
     if spec == "random":
         return "随机AI"
+    if spec.endswith("?search"):
+        return os.path.splitext(os.path.basename(spec[:-7]))[0] + "+搜索"
     return os.path.splitext(os.path.basename(spec))[0]

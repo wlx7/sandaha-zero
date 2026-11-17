@@ -25,12 +25,12 @@
 | Preset | Play network | Params | Self-play / core* |
 |---|---|---|---|
 | tiny | 256-256 | 0.44M | fastest |
-| small | 512-256-256 | 1.0M | ~35 games/s |
-| medium | 768-512-256 | 1.6M | ~20 games/s |
-| large | 1024-1024-512-256 | 3.5M | ~6 games/s |
+| small | 512-256-256 | 1.0M | ~11 games/s |
+| medium (default) | 768-512-256 | 1.6M | ~6 games/s |
+| large | 1024-1024-512-256 | 3.5M | ~3 games/s |
 | xlarge | 2048-1024-1024-512 | 6.6M | slow |
 
-\* approximate, CPU dependent.
+\* measured per worker with 14 workers on a laptop; CPU dependent. Use small when compute is limited and medium when it is plentiful (see *Model size* in the README).
 
 ## 3. Output
 
@@ -54,6 +54,16 @@ bash scripts/runpod_train.sh main medium 3 --actors 30
 3. Watch progress with `tail -f runs/main/metrics.jsonl`.
 4. Download from `https://<podid>-8000.proxy.runpod.net/main/final.npz`, or copy the whole `runs/main` folder into your local `runs/` to see the curves in the dashboard.
 5. **Stop or terminate the pod when you are done.**
+
+### Vast.ai / other clouds
+
+The script is plain Linux and has nothing RunPod-specific. Choose a PyTorch image with **as many CPU threads as possible**. A 128-thread EPYC + RTX 3070 on Vast.ai reached ≈1,450 games/s, more than 6× the 32-vCPU RunPod pod.
+
+```bash
+bash scripts/runpod_train.sh main medium 3 --actors 110 --batch 1024 --replay 1.0
+```
+
+Expose `http://localhost:8000` (tunnel or port mapping) to download results. Resume after an interruption with `--init runs/<name>/latest.pt`.
 
 ## 5. Evaluation
 

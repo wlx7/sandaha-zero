@@ -178,14 +178,14 @@ class Room:
                     cards = []
                     comment = self._comment(g, s, None) if self.mode == TEACH else None
                     while g.phase == BURY:
-                        a = seat.agent.act(g)
+                        a = await asyncio.to_thread(seat.agent.act, g)
                         cards.append(a)
                         g.step(a)
                     if comment:
                         comment["chosen"] = "埋 " + " ".join(describe_action(PLAY, (t,)) for t in cards)
                         self.comments.append(comment)
                 else:
-                    a = seat.agent.act(g)
+                    a = await asyncio.to_thread(seat.agent.act, g)
                     if self.mode == TEACH:
                         c = self._comment(g, s, a)
                         if c:

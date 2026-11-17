@@ -12,6 +12,7 @@ const ICONS = {
   brain: '<svg viewBox="0 0 24 24" fill="none" stroke="#e3b341" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h2M8 18h2M14 6l2 5M14 18l2-5"/></svg>',
 };
 
+const kfmt = (v) => (v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'M' : v.toFixed(0) + 'k');
 const STATE_ZH = { running: '训练中', starting: '启动中', evaluating: '评测中', finished: '已完成', stale: '已中断', error: '出错' };
 
 export function mountTrain(app) {
@@ -180,20 +181,20 @@ export function mountTrain(app) {
       { name: '对规则AI', color: COLORS.rule, points: ev.map((e) => [xs(e), e.vs_rule.win_rate]) },
       { name: '对基准模型', color: COLORS.base, points: ev.filter((e) => e.vs_baseline).map((e) => [xs(e), e.vs_baseline.win_rate]) },
       { name: '对上一检查点', color: COLORS.prev, points: ev.filter((e) => e.vs_prev).map((e) => [xs(e), e.vs_prev.win_rate]), dash: '5 4' },
-    ], { yFmt: (v) => (v * 100).toFixed(0) + '%', xFmt: (v) => v.toFixed(0) + 'k', xName: '局数(千)', refLine: 0.5, yMin: 0, yMax: 1 });
+    ], { yFmt: (v) => (v * 100).toFixed(0) + '%', xFmt: kfmt, xName: '局数(千)', refLine: 0.5, yMin: 0, yMax: 1 });
     const scoreChart = lineChart([
       { name: '对规则AI 净得分/局', color: COLORS.rule, points: ev.map((e) => [xs(e), e.vs_rule.avg_score]) },
       { name: '对基准模型', color: COLORS.base, points: ev.filter((e) => e.vs_baseline).map((e) => [xs(e), e.vs_baseline.avg_score]) },
       { name: '做庄胜率 (vs规则)', color: '#c77dff', points: ev.map((e) => [xs(e), e.vs_rule.banker_win_rate]), dash: '3 3' },
-    ], { yFmt: (v) => fmt(v, 2), xFmt: (v) => v.toFixed(0) + 'k', xName: '局数(千)', refLine: 0 });
+    ], { yFmt: (v) => fmt(v, 2), xFmt: kfmt, xName: '局数(千)', refLine: 0 });
     const lossChart = lineChart(['play', 'bid', 'bury', 'trump'].map((p) => ({
       name: { play: '出牌', bid: '叫分', bury: '埋底', trump: '定主' }[p], color: COLORS[p],
       points: ms.filter((m) => m[`loss_${p}`] !== undefined).map((m) => [xs(m), m[`loss_${p}`]]),
-    })), { yFmt: (v) => fmt(v, 3), xFmt: (v) => v.toFixed(0) + 'k', xName: '局数(千)' });
+    })), { yFmt: (v) => fmt(v, 3), xFmt: kfmt, xName: '局数(千)' });
     const lrChart = lineChart([{ name: '学习率', color: '#c77dff', points: ms.filter((m) => m.lr !== undefined).map((m) => [xs(m), m.lr]) }],
-      { yFmt: (v) => v.toExponential(1), xFmt: (v) => v.toFixed(0) + 'k', xName: '局数(千)', yMin: 0 });
+      { yFmt: (v) => v.toExponential(1), xFmt: kfmt, xName: '局数(千)', yMin: 0 });
     const speedChart = lineChart([{ name: '局/秒', color: COLORS.base, points: ms.map((m) => [xs(m), m.games_per_s]) }],
-      { yFmt: (v) => fmt(v, 0), xFmt: (v) => v.toFixed(0) + 'k', xName: '局数(千)', yMin: 0 });
+      { yFmt: (v) => fmt(v, 0), xFmt: kfmt, xName: '局数(千)', yMin: 0 });
     const evalTable = h('table', { class: 'evals' }, h('tr', {}, h('th', {}, '检查点'), h('th', {}, 'vs规则 胜率'), h('th', {}, '净得分'), h('th', {}, '做庄率'), h('th', {}, '做庄胜率'), h('th', {}, 'vs基准'), h('th', {}, 'vs上一版')));
     for (const e of ev.slice().reverse().slice(0, 12)) {
       evalTable.append(h('tr', {}, h('td', {}, big(e.games)), h('td', {}, pct(e.vs_rule.win_rate)), h('td', {}, fmt(e.vs_rule.avg_score, 2)),

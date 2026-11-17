@@ -8,7 +8,9 @@ A self-play reinforcement-learning AI for **San Da Ha (三打哈)**, the Hunan t
 - **One model makes every decision**: bidding, trump or surrender, burying, and card play (including going for 扣底). The training target is the **expected score including multipliers**, so win probability and multipliers are traded off automatically.
 - **Light deployment**: playing needs only numpy (no PyTorch, no GPU). Training uses PyTorch, which the dashboard can install with one click.
 
-![table](docs/img/table.png)
+![teaching mode](docs/img/table.jpg)
+
+<p><img src="docs/img/mobile.jpg" width="260" alt="mobile"> <img src="docs/img/train.jpg" width="540" alt="training dashboard"></p>
 
 ## Quick start
 
@@ -80,11 +82,48 @@ Design details:
 
 ### Model size
 
-<!--RESULTS_SIZE-->
+Each size trained for **45 minutes** on a laptop (20 threads, 14 self-play workers):
+
+| Preset | Params | Self-play speed | Games in 45 min | Win rate vs rule AI |
+|---|---|---|---|---|
+| small | 1.0M | 151 games/s | 405k | 65–68% |
+| medium | 1.6M | 87 games/s | 233k | 58–62% |
+| large | 3.5M | 44 games/s | 119k | 51–59% |
+
+Head-to-head (800 games each): small beats medium **69.2%**, small beats large **67.2%**, and medium beats large **56.8%**.
+
+With limited compute, **data, not capacity, is the bottleneck**, so smaller networks win. With a 128-thread Vast.ai machine, medium was trained to 14.2M games and then beat small 60.9%. medium is therefore the default (`models/sandaha-best.npz`), and small ships as a lightweight option (`models/sandaha-lite.npz`).
 
 ### Results
 
-<!--RESULTS_MAIN-->
+**Training** (≈14.2M self-play games in total; the full curves are in the dashboard under `official`):
+
+| Stage | Machine | Games | Win rate vs rule AI |
+|---|---|---|---|
+| 1 | RunPod 32-vCPU CPU pod ($1.12/h, ~40 min) | 0 → 0.46M | 72.2% |
+| 2 | Vast.ai 128 threads + RTX 3070, constant LR | 0.35M → 3.68M | 74–75% (plateau) |
+| 3 | same, cosine LR decay 3e-4 → 2e-5 for 2 h | 3.68M → 14.2M | **76.1%**, **+2.13** per game |
+
+The learning-rate decay broke the plateau. With a constant LR, the 3.68M model was even (50.0%) against the 2.35M model. After the decay, the final model beats the 2.35M model 57.1%.
+
+**Final benchmark** (`scripts/benchmark.py`; each row is 486 deals × seat swap = 972 games; ± is a 95% CI):
+
+| Opponent | Win rate | Net score / game | Our banker rate | Banker win rate |
+|---|---|---|---|---|
+| Rule-based AI | **73.4% ± 2.8** | **+1.99** | 18.2% | 75.1% |
+| Random | 99.8% ± 0.3 | +5.62 | 0.6% | — |
+| Old: local medium (233k games) | 74.7% ± 2.7 | +1.43 | 53.4% | 66.1% |
+| Old: RunPod (462k) | 57.3% ± 3.1 | +0.56 | 53.6% | 55.5% |
+| Old: Vast (2.35M) | 53.5% ± 3.1 | +0.30 | 53.0% | 55.5% |
+| Old: Vast (5.0M) | 52.5% ± 3.1 | +0.18 | 52.8% | 52.4% |
+| small / lite (405k) | 60.9% ± 3.1 | +0.85 | 52.9% | 61.5% |
+
+Notes:
+- **Win rate** is the share of games where our two seats' combined score is positive. 三打哈 is 1-vs-3 and individual hands are very luck-dependent. The duplicate format (the same deal replayed with seats swapped) cancels most of the luck.
+- Against the rule AI, our AI is rarely the banker (18%). The rule AI bids aggressively, and our AI learned to let it take the contract and profit as a defender. When our AI is the banker, it wins 75% of the time.
+- The AI learned to **surrender** bad banker hands. With a contract ≥ 55, surrender settles as an ordinary loss (−3) and avoids 小倒/大倒 (−6/−9).
+
+**Search (optional)**: for card play, the agent takes the network's top-3 moves, rolls each out to the end of the hand under 8 sampled deals consistent with what it has seen, and picks the best average. Against the same model without search, over 1,200 games: +0.15 ± 0.18 per deal. That is a small gain, not yet statistically significant, so search is off by default. Choose "+ 搜索增强" when picking an AI to enable it.
 
 ## Layout
 
@@ -92,7 +131,7 @@ Design details:
 sandaha/   cards, rules, moves, engine (pure Python rules engine)
            bots/ (rule-based baseline), ai/ (features, numpy inference, agent)
            train/ (DMC actors + learner, CLI), server/ (FastAPI + WebSocket), web/ (vanilla JS client)
-models/    pretrained models (sandaha-best.npz is the default AI)
+models/    pretrained models: sandaha-best.npz (default, medium), sandaha-lite.npz (lightweight, small)
 runs/      training output
 docs/      rules and training docs
 tests/     pytest unit tests

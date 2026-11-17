@@ -1,0 +1,39 @@
+{
+  "name": "official",
+  "preset": "medium",
+  "play_hidden": [
+    768,
+    512,
+    256
+  ],
+  "aux_hidden": [
+    256,
+    128
+  ],
+  "num_actors": 110,
+  "device": "auto",
+  "learner_threads": 0,
+  "lr": 0.0003,
+  "lr_end": 2e-05,
+  "lr_schedule": "cosine",
+  "batch_size": 1024,
+  "buffer_size": 300000,
+  "replay_ratio": 1.0,
+  "epsilon_start": 0.1,
+  "epsilon_end": 0.01,
+  "epsilon_decay_games": 300000,
+  "max_games": 0,
+  "max_hours": 2.0,
+  "export_every": 50,
+  "eval_every_minutes": 15.0,
+  "eval_deals": 400,
+  "baseline": "runs/main-vast/checkpoints/ckpt_002346189.npz",
+  "init_from": "",
+  "seed": 0,
+  "no_surrender_games": 300000,
+  "no_surrender_frac": 0.3,
+  "loss_win_weight": 0.3,
+  "loss_pts_weight": 0.3,
+  "rules": {},
+  "note": "Official medium model: RunPod CPU pod 0-0.46M games, Vast.ai 0.35M-14.2M games (constant LR until 3.68M, cosine decay after)."
+}
