@@ -152,7 +152,7 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 .topbar .tools { display: flex; gap: 6px; flex-wrap: wrap; }
 .main-area { flex: 1; display: flex; min-height: 0; }
 .felt { flex: 1; min-width: 0; display: grid; grid-template-columns: clamp(78px, 17vw, 170px) minmax(0, 1fr) clamp(78px, 17vw, 170px);
-  grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "tl top tr" "left center right" "me me me" "hand hand hand";
+  grid-template-rows: auto minmax(130px, 1fr) auto auto; grid-template-areas: "tl top tr" "left center right" "me me me" "hand hand hand";
   background: radial-gradient(ellipse at center, var(--felt1) 0%, var(--felt2) 75%); padding: 8px; gap: 6px; overflow-y: auto; overflow-x: hidden; }
 .seat { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border-radius: 12px; min-width: 0; }
 .seat.top { grid-area: top; }
@@ -278,3 +278,21 @@ table.evals { width: 100%; border-collapse: collapse; font-size: .85rem; }
 table.evals th, table.evals td { padding: 5px 6px; border-bottom: 1px solid #23493c; text-align: right; }
 table.evals th:first-child, table.evals td:first-child { text-align: left; }
 .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
+
+/* short screens (phones in landscape) */
+@media (max-height: 520px) {
+  :root { --cw: 48px; --ch: 66px; --cfont: 15px; --tcw: 36px; --tch: 50px; --tfont: 12px; }
+  .reveal .mini-hand { display: none; }
+  .seat { padding: 2px; gap: 2px; }
+  .seat.top { flex-direction: row; flex-wrap: wrap; justify-content: center; column-gap: 8px; }
+  .avatar { width: 32px; height: 32px; font-size: .85rem; }
+  .center { min-height: 120px; }
+  .felt { padding: 4px; gap: 2px; grid-template-rows: auto minmax(120px, 1fr) auto auto; }
+  .topbar { min-height: 36px; padding: 2px 6px; }
+  .btn.sm { min-height: 26px; padding: 2px 8px; }
+  .actions { min-height: 32px; }
+  .actions .btn { min-height: 32px; padding: 4px 10px; }
+  .bid-grid { max-width: none; gap: 4px; }
+  .bid-grid .btn { min-width: 38px; padding: 2px 6px; }
+  .actions .msg { font-size: .85rem; }
+}

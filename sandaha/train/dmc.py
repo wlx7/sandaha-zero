@@ -195,13 +195,19 @@ def train(cfg, run_dir, log=print):
     if device == "cpu":
         torch.set_num_threads(cfg.learner_threads or max(2, min(8, (os.cpu_count() or 8) // 4)))
     arch = cfg.arch()
+    init_model = None
+    if cfg.init_from and cfg.init_from.endswith(".npz"):
+        init_model = Model.load(cfg.init_from)
+        if init_model.meta.get("arch"):
+            arch = init_model.meta["arch"]  # warm start keeps the checkpoint's architecture
+    elif cfg.init_from:
+        arch = torch.load(cfg.init_from, map_location="cpu").get("arch", arch)
     net = SanDaHaNet(arch).to(device)
     games_offset = 0
     if cfg.init_from:
-        if cfg.init_from.endswith(".npz"):
-            m = Model.load(cfg.init_from)
-            net.load_numpy(m.params)
-            games_offset = int(m.meta.get("games", 0))
+        if init_model is not None:
+            net.load_numpy(init_model.params)
+            games_offset = int(init_model.meta.get("games", 0))
         else:
             sd = torch.load(cfg.init_from, map_location=device)
             net.load_state_dict(sd["net"])
