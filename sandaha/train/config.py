@@ -14,6 +14,7 @@ class TrainConfig:
     num_actors: int = 0                 # 0 = auto (cpu_count - 2)
     device: str = "auto"                # auto / cpu / cuda
     learner_threads: int = 0            # torch threads for a CPU learner (0 = auto)
+    games_per_actor: int = 8            # hands each worker plays side by side (batched inference)
     lr: float = 3e-4
     lr_end: float = 2e-5                # final learning rate of the schedule
     lr_schedule: str = "cosine"         # constant / linear / cosine (over max_hours, else max_games)

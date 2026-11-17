@@ -64,6 +64,8 @@ def actor_main(idx, run_dir, q, cfg_dict, stop_event, games_counter):
     rng = random.Random(cfg.seed * 1000 + idx)
     latest = os.path.join(run_dir, "latest.npz")
     ver_path = os.path.join(run_dir, "latest.ver")
+    if cfg.games_per_actor > 1:
+        return _batched_actor(cfg, rules, rules_ns, rng, latest, ver_path, q, stop_event, games_counter)
     model, ver = None, None
     try:
         while not stop_event.is_set():
@@ -115,6 +117,102 @@ def actor_main(idx, run_dir, q, cfg_dict, stop_event, games_counter):
                     break
                 except queue_mod.Full:
                     continue
+    except KeyboardInterrupt:
+        pass
+
+
+def _game_batch(g, record):
+    """Turn one finished game's decisions into training arrays per phase."""
+    res = g.result
+    pts = min(res["xian_points"], 400) / 400
+    by_phase = {}
+    for seat, phase, st, a in record:
+        sc = res["scores"][seat]
+        S, A, T = by_phase.setdefault(phase, ([], [], []))
+        S.append(st)
+        A.append(a)
+        T.append((sc / 9.0, 1.0 if sc > 0 else 0.0, pts))
+    return {phase: (np.rint(np.stack(S) * 255).astype(np.uint8),
+                    np.rint(np.stack(A) * 255).astype(np.uint8),
+                    np.asarray(T, np.float32))
+            for phase, (S, A, T) in by_phase.items()}
+
+
+def _batched_actor(cfg, rules, rules_ns, rng, latest, ver_path, q, stop_event, games_counter):
+    """Play ``games_per_actor`` hands side by side and evaluate all pending
+    decisions of the same phase in one network pass.  Every forward pass then
+    streams the weights from memory once for many decisions instead of once
+    per decision, which is what limits throughput on many-core machines."""
+    from ..ai import features as F
+    from ..ai.model import Model
+    from ..engine import Game
+
+    model, ver = None, None
+    K = cfg.games_per_actor
+
+    def new_game():
+        n = games_counter.value
+        no_sur = n < cfg.no_surrender_games or rng.random() < cfg.no_surrender_frac
+        return Game(rules_ns if no_sur else rules, seed=rng.randrange(1 << 30),
+                    first_bidder=rng.randrange(4))
+
+    def epsilon():
+        frac = min(1.0, games_counter.value / max(1, cfg.epsilon_decay_games))
+        return cfg.epsilon_start + (cfg.epsilon_end - cfg.epsilon_start) * frac
+
+    games = []
+    records = []
+    pending = []
+    try:
+        while not stop_event.is_set():
+            try:
+                with open(ver_path) as f:
+                    v = f.read().strip()
+            except OSError:
+                v = None
+            if v is not None and v != ver:
+                try:
+                    model = Model.load(latest)
+                    ver = v
+                except Exception:
+                    time.sleep(0.2)
+                    continue
+            if model is None:
+                time.sleep(0.5)
+                continue
+            while len(games) < K:
+                games.append(new_game())
+                records.append([])
+            eps = epsilon()
+            # one decision for every live game, grouped by phase
+            groups = {}
+            for i, g in enumerate(games):
+                s = g.to_act
+                acts = g.legal_actions()
+                phase, st, A = F.encode(g, s, acts)
+                groups.setdefault(phase, []).append((i, s, acts, st, A))
+            for phase, items in groups.items():
+                outs = model.q_batch(phase, [it[3] for it in items], [it[4] for it in items])
+                for (i, s, acts, st, A), out in zip(items, outs):
+                    if len(acts) > 1 and rng.random() < eps:
+                        j = rng.randrange(len(acts))
+                    else:
+                        j = int(np.argmax(out[:, 0]))
+                    records[i].append((s, phase, st, A[j]))
+                    games[i].step(acts[j])
+            # harvest finished games
+            for i in range(len(games) - 1, -1, -1):
+                if games[i].over:
+                    pending.append(_game_batch(games[i], records[i]))
+                    del games[i], records[i]
+                    with games_counter.get_lock():
+                        games_counter.value += 1
+            while pending and not stop_event.is_set():
+                try:
+                    q.put(pending[0], timeout=0.5)
+                    pending.pop(0)
+                except queue_mod.Full:
+                    break
     except KeyboardInterrupt:
         pass
 

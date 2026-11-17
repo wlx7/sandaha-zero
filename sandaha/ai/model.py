@@ -46,12 +46,28 @@ class NumpyNet:
         h = state @ self.W0s + self.b0
         h = actions @ self.W0a + h
         np.maximum(h, 0, out=h)
+        return self._tail(h)
+
+    def _tail(self, h):
         n = len(self.Ws)
         for i, (W, b) in enumerate(zip(self.Ws, self.bs)):
             h = h @ W + b
             if i < n - 1:
                 np.maximum(h, 0, out=h)
         return h
+
+    def batch(self, states, actions_list):
+        """Evaluate many decisions at once (one weight pass for all of them).
+
+        states: (n, s_dim); actions_list: n matrices (m_i, a_dim).
+        Returns a list of (m_i, OUT) arrays."""
+        sizes = [len(a) for a in actions_list]
+        hs = states @ self.W0s + self.b0                      # (n, H)
+        A = np.concatenate(actions_list, 0)                    # (M, a_dim)
+        h = A @ self.W0a + np.repeat(hs, sizes, axis=0)
+        np.maximum(h, 0, out=h)
+        out = self._tail(h)
+        return np.split(out, np.cumsum(sizes)[:-1])
 
 
 class Model:
@@ -74,6 +90,9 @@ class Model:
 
     def q(self, phase, state, actions):
         return self.nets[phase](state, actions)
+
+    def q_batch(self, phase, states, actions_list):
+        return self.nets[phase].batch(np.stack(states), actions_list)
 
     @classmethod
     def load(cls, path):

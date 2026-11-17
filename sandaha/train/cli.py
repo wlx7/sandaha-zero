@@ -49,6 +49,7 @@ def main(argv=None):
     t.add_argument("--eval-deals", type=int)
     t.add_argument("--device")
     t.add_argument("--learner-threads", type=int)
+    t.add_argument("--games-per-actor", type=int)
     t.add_argument("--replay", type=float)
     t.add_argument("--runs-dir", default="runs")
     e = sub.add_parser("eval")
@@ -66,7 +67,7 @@ def main(argv=None):
                         ("hours", "max_hours"), ("games", "max_games"), ("lr", "lr"), ("lr_end", "lr_end"), ("lr_schedule", "lr_schedule"),
                         ("batch", "batch_size"), ("init", "init_from"), ("baseline", "baseline"),
                         ("eval_minutes", "eval_every_minutes"), ("eval_deals", "eval_deals"),
-                        ("device", "device"), ("learner_threads", "learner_threads"),
+                        ("device", "device"), ("learner_threads", "learner_threads"), ("games_per_actor", "games_per_actor"),
                         ("replay", "replay_ratio")):
             v = getattr(args, k)
             if v is not None:
