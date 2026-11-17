@@ -20,6 +20,7 @@ Run directory layout::
 from __future__ import annotations
 
 import json
+import math
 import multiprocessing as mp
 import os
 import queue as queue_mod
@@ -214,6 +215,23 @@ def train(cfg, run_dir, log=print):
             games_offset = int(sd.get("games", 0))
         log(f"warm start from {cfg.init_from} ({games_offset} games)")
     opt = torch.optim.Adam(net.parameters(), lr=cfg.lr)
+
+    def lr_at(now, games):
+        """Learning-rate schedule driven by elapsed time (or games if no time limit)."""
+        if cfg.lr_schedule == "constant":
+            return cfg.lr
+        if cfg.max_hours:
+            frac = (now - t_start) / (cfg.max_hours * 3600)
+        elif cfg.max_games:
+            frac = (games - games_offset) / cfg.max_games
+        else:
+            return cfg.lr
+        frac = min(1.0, max(0.0, frac))
+        if cfg.lr_schedule == "linear":
+            w = 1 - frac
+        else:
+            w = 0.5 * (1 + math.cos(math.pi * frac))
+        return cfg.lr_end + (cfg.lr - cfg.lr_end) * w
     meta = {"name": cfg.name, "arch": arch, "rules": cfg.rules, "version": 1}
 
     def export(path, games):
@@ -303,6 +321,9 @@ def train(cfg, run_dir, log=print):
             t1 = time.time()
             t_ingest += t1 - t0
             # ---- learn
+            cur_lr = lr_at(t1, games_counter.value)
+            for grp in opt.param_groups:
+                grp["lr"] = cur_lr
             for p in PHASES:
                 b = bufs[p]
                 if b.size < min_fill[p]:
@@ -333,7 +354,7 @@ def train(cfg, run_dir, log=print):
             if now - last_metric >= 10:
                 rec = {"type": "train", "time": now, "elapsed": now - t_start, "games": games,
                        "games_per_s": (games - last_games) / (now - last_metric),
-                       "steps": total_steps, "version": version,
+                       "steps": total_steps, "version": version, "lr": cur_lr,
                        "epsilon": cfg.epsilon_start + (cfg.epsilon_end - cfg.epsilon_start) *
                        min(1.0, games / max(1, cfg.epsilon_decay_games))}
                 for p in PHASES:

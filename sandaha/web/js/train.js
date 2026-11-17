@@ -60,6 +60,15 @@ export function mountTrain(app) {
     return sel;
   }
 
+  function lrSched() {
+    const F = st.form;
+    const sel = h('select', { title: '学习率衰减方式（按最长时间计算进度）' },
+      h('option', { value: 'cosine' }, '余弦衰减'), h('option', { value: 'linear' }, '线性衰减'), h('option', { value: 'constant' }, '不衰减'));
+    sel.value = F.lr_schedule || 'cosine';
+    sel.addEventListener('change', () => { F.lr_schedule = sel.value; store.set('sdh.trainform', F); });
+    return sel;
+  }
+
   function formBox() {
     const F = st.form;
     const presetSel = h('select', {}, Object.entries(st.presets).map(([k, v]) =>
@@ -99,7 +108,7 @@ export function mountTrain(app) {
         h('div', { class: 'full' }, custom),
         h('label', {}, '设备'), dev,
         h('label', {}, '自对弈进程数'), h('div', { class: 'row' }, field('num_actors', 'number', { min: 0, max: 256, style: { width: '90px' } }), h('span', { class: 'hint' }, `0 = 自动 (本机 ${st.cpus} 线程)`)),
-        h('label', {}, '学习率'), field('lr', 'number', { step: 0.0001 }),
+        h('label', {}, '学习率'), h('div', { class: 'row' }, field('lr', 'number', { step: 0.0001, style: { width: '100px' } }), '→', field('lr_end', 'number', { step: 0.00001, style: { width: '100px' } }), lrSched()),
         h('label', {}, '批大小'), field('batch_size', 'number', { step: 256 }),
         h('label', {}, '样本复用率'), field('replay_ratio', 'number', { step: 0.5 }),
         h('label', {}, '探索率 ε'), h('div', { class: 'row' }, field('epsilon_start', 'number', { step: 0.01, style: { width: '80px' } }), '→', field('epsilon_end', 'number', { step: 0.005, style: { width: '80px' } })),
@@ -181,6 +190,8 @@ export function mountTrain(app) {
       name: { play: '出牌', bid: '叫分', bury: '埋底', trump: '定主' }[p], color: COLORS[p],
       points: ms.filter((m) => m[`loss_${p}`] !== undefined).map((m) => [xs(m), m[`loss_${p}`]]),
     })), { yFmt: (v) => fmt(v, 3), xFmt: (v) => v.toFixed(0) + 'k', xName: '局数(千)' });
+    const lrChart = lineChart([{ name: '学习率', color: '#c77dff', points: ms.filter((m) => m.lr !== undefined).map((m) => [xs(m), m.lr]) }],
+      { yFmt: (v) => v.toExponential(1), xFmt: (v) => v.toFixed(0) + 'k', xName: '局数(千)', yMin: 0 });
     const speedChart = lineChart([{ name: '局/秒', color: COLORS.base, points: ms.map((m) => [xs(m), m.games_per_s]) }],
       { yFmt: (v) => fmt(v, 0), xFmt: (v) => v.toFixed(0) + 'k', xName: '局数(千)', yMin: 0 });
     const evalTable = h('table', { class: 'evals' }, h('tr', {}, h('th', {}, '检查点'), h('th', {}, 'vs规则 胜率'), h('th', {}, '净得分'), h('th', {}, '做庄率'), h('th', {}, '做庄胜率'), h('th', {}, 'vs基准'), h('th', {}, 'vs上一版')));
@@ -202,7 +213,8 @@ export function mountTrain(app) {
         h('div', { class: 'card-box' }, h('h3', {}, '胜率曲线'), winChart),
         h('div', { class: 'card-box' }, h('h3', {}, '得分 / 做庄胜率'), scoreChart),
         h('div', { class: 'card-box' }, h('h3', {}, '训练损失 (Q 值 MSE)'), lossChart),
-        h('div', { class: 'card-box' }, h('h3', {}, '自对弈速度'), speedChart)),
+        h('div', { class: 'card-box' }, h('h3', {}, '自对弈速度'), speedChart),
+        h('div', { class: 'card-box' }, h('h3', {}, '学习率'), lrChart)),
       h('div', { class: 'card-box', style: { marginTop: '14px', overflowX: 'auto' } }, h('h3', {}, '评测结果（换位复式赛）'), ev.length ? evalTable : h('div', { class: 'empty' }, '第一次评测将在评测间隔后进行')),
       h('details', { style: { marginTop: '10px' } }, h('summary', {}, '训练配置与日志'),
         h('pre', { class: 'log' }, JSON.stringify(d.config, null, 1)), h('pre', { class: 'log' }, d.log || '')));

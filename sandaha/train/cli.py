@@ -40,6 +40,8 @@ def main(argv=None):
     t.add_argument("--hours", type=float)
     t.add_argument("--games", type=int)
     t.add_argument("--lr", type=float)
+    t.add_argument("--lr-end", type=float)
+    t.add_argument("--lr-schedule", choices=["constant", "linear", "cosine"])
     t.add_argument("--batch", type=int)
     t.add_argument("--init")
     t.add_argument("--baseline")
@@ -61,7 +63,7 @@ def main(argv=None):
         from .dmc import train
         cfg = TrainConfig.load(args.config) if args.config else TrainConfig()
         for k, attr in (("name", "name"), ("preset", "preset"), ("actors", "num_actors"),
-                        ("hours", "max_hours"), ("games", "max_games"), ("lr", "lr"),
+                        ("hours", "max_hours"), ("games", "max_games"), ("lr", "lr"), ("lr_end", "lr_end"), ("lr_schedule", "lr_schedule"),
                         ("batch", "batch_size"), ("init", "init_from"), ("baseline", "baseline"),
                         ("eval_minutes", "eval_every_minutes"), ("eval_deals", "eval_deals"),
                         ("device", "device"), ("learner_threads", "learner_threads"),

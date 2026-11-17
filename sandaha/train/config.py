@@ -15,6 +15,8 @@ class TrainConfig:
     device: str = "auto"                # auto / cpu / cuda
     learner_threads: int = 0            # torch threads for a CPU learner (0 = auto)
     lr: float = 3e-4
+    lr_end: float = 2e-5                # final learning rate of the schedule
+    lr_schedule: str = "cosine"         # constant / linear / cosine (over max_hours, else max_games)
     batch_size: int = 1024
     buffer_size: int = 300_000          # play samples kept in replay (others scaled)
     replay_ratio: float = 2.0           # times each sample is used on average
