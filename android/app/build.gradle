@@ -1,0 +1,132 @@
+plugins {
+    id 'com.android.application'
+    id 'com.chaquo.python'
+}
+
+def repoRoot = file("../..")
+def genPyDir = file("$buildDir/generated/python_src")
+def genAssetsDir = file("$buildDir/generated/assets_out")
+def autoKeystore = file("$buildDir/sandaha-release.jks")
+
+tasks.register("syncSandahaAssets") {
+    doLast {
+        delete(genPyDir)
+        delete(genAssetsDir)
+        copy {
+            from("$repoRoot/sandaha")
+            into("$genPyDir/sandaha")
+            include "**/*.py"
+        }
+        copy {
+            from("$repoRoot/sandaha/web")
+            into("$genAssetsDir/web")
+        }
+        copy {
+            from("$repoRoot/models")
+            into("$genAssetsDir/models")
+            include "*.npz"
+            include "*.json"
+        }
+        genAssetsDir.mkdirs()
+        new File(genAssetsDir, "version.txt").text = android.defaultConfig.versionName + "-" + System.currentTimeMillis()
+    }
+}
+
+tasks.register("ensureReleaseKeystore") {
+    doLast {
+        if (!autoKeystore.exists()) {
+            autoKeystore.parentFile.mkdirs()
+            def javaHome = System.getProperty("java.home")
+            def keytoolBin = new File(javaHome, "bin/keytool" + (System.getProperty("os.name").toLowerCase().contains("win") ? ".exe" : ""))
+            exec {
+                commandLine(
+                    keytoolBin.exists() ? keytoolBin.absolutePath : "keytool",
+                    "-genkeypair", "-v",
+                    "-keystore", autoKeystore.absolutePath,
+                    "-alias", "sandaha",
+                    "-keyalg", "RSA",
+                    "-keysize", "2048",
+                    "-validity", "10000",
+                    "-storepass", "sandaha2026",
+                    "-keypass", "sandaha2026",
+                    "-dname", "CN=SanDaHa-Zero, OU=AI, O=SanDaHa, L=Changsha, S=Hunan, C=CN"
+                )
+            }
+        }
+    }
+}
+
+android {
+    namespace 'com.sandaha.zero'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.sandaha.zero"
+        minSdk 26
+        targetSdk 34
+        versionCode 2
+        versionName "2.0.0"
+
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile autoKeystore
+            storePassword "sandaha2026"
+            keyAlias "sandaha"
+            keyPassword "sandaha2026"
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += [genAssetsDir]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version "3.11"
+        pip {
+            install "numpy"
+            install "segno"
+        }
+        pyc {
+            src false
+        }
+    }
+    sourceSets {
+        main {
+            srcDir genPyDir
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == "preBuild" || task.name.contains("Python") || task.name.contains("Assets") || task.name.contains("ValidateSigning")) {
+        if (task.name != "syncSandahaAssets" && task.name != "ensureReleaseKeystore") {
+            task.dependsOn("syncSandahaAssets", "ensureReleaseKeystore")
+        }
+    }
+}

@@ -25,7 +25,7 @@ class AIAgent:
     def _scores(self, g):
         s = g.to_act
         acts = g.legal_actions()
-        phase, st, A = F.encode(g, s, acts)
+        phase, st, A = F.encode(g, s, acts, self.model.feat_ver)
         out = self.model.q(phase, st, A)
         return acts, phase, st, A, out
 

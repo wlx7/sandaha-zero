@@ -21,11 +21,14 @@ def _agent(spec, seed=1):
         return RuleBot(seed=seed)
     if spec == "random":
         return RandomBot(seed=seed)
+    if spec.endswith("?search"):
+        from ..ai.search import SearchAgent
+        return SearchAgent(Model.load(spec[:-7]), seed=seed)
     return AIAgent(Model.load(spec))
 
 
 def main(argv=None):
-    if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    if sys.stdout and sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
         try:
             sys.stdout.reconfigure(encoding="utf-8")
         except Exception:
@@ -36,6 +39,8 @@ def main(argv=None):
     t.add_argument("--config")
     t.add_argument("--name")
     t.add_argument("--preset")
+    t.add_argument("--arch-type", choices=["dueling_film_v2", "mlp_v1"])
+    t.add_argument("--feat-ver", type=int, choices=[1, 2])
     t.add_argument("--actors", type=int)
     t.add_argument("--hours", type=float)
     t.add_argument("--games", type=int)
@@ -43,14 +48,28 @@ def main(argv=None):
     t.add_argument("--lr-end", type=float)
     t.add_argument("--lr-schedule", choices=["constant", "linear", "cosine"])
     t.add_argument("--batch", type=int)
+    t.add_argument("--buffer", type=int)
     t.add_argument("--init")
     t.add_argument("--baseline")
+    t.add_argument("--teacher")
+    t.add_argument("--teacher-games", type=int)
+    t.add_argument("--teacher-frac", type=float)
+    t.add_argument("--league-frac", type=float)
+    t.add_argument("--ema-decay", type=float)
+    t.add_argument("--no-surrender-games", type=int)
+    t.add_argument("--no-surrender-frac", type=float)
+    t.add_argument("--q-noise-min", type=float)
+    t.add_argument("--q-noise-max", type=float)
+    t.add_argument("--eps-start", type=float)
+    t.add_argument("--eps-end", type=float)
     t.add_argument("--eval-minutes", type=float)
     t.add_argument("--eval-deals", type=int)
     t.add_argument("--device")
     t.add_argument("--learner-threads", type=int)
     t.add_argument("--games-per-actor", type=int)
+    t.add_argument("--send-games", type=int)
     t.add_argument("--replay", type=float)
+    t.add_argument("--seed", type=int)
     t.add_argument("--runs-dir", default="runs")
     e = sub.add_parser("eval")
     e.add_argument("a")
@@ -63,19 +82,51 @@ def main(argv=None):
         from .config import TrainConfig
         from .dmc import train
         cfg = TrainConfig.load(args.config) if args.config else TrainConfig()
-        for k, attr in (("name", "name"), ("preset", "preset"), ("actors", "num_actors"),
-                        ("hours", "max_hours"), ("games", "max_games"), ("lr", "lr"), ("lr_end", "lr_end"), ("lr_schedule", "lr_schedule"),
-                        ("batch", "batch_size"), ("init", "init_from"), ("baseline", "baseline"),
-                        ("eval_minutes", "eval_every_minutes"), ("eval_deals", "eval_deals"),
-                        ("device", "device"), ("learner_threads", "learner_threads"), ("games_per_actor", "games_per_actor"),
-                        ("replay", "replay_ratio")):
+        for k, attr in (
+            ("name", "name"),
+            ("preset", "preset"),
+            ("arch_type", "arch_type"),
+            ("feat_ver", "feat_ver"),
+            ("actors", "num_actors"),
+            ("hours", "max_hours"),
+            ("games", "max_games"),
+            ("lr", "lr"),
+            ("lr_end", "lr_end"),
+            ("lr_schedule", "lr_schedule"),
+            ("batch", "batch_size"),
+            ("buffer", "buffer_size"),
+            ("init", "init_from"),
+            ("baseline", "baseline"),
+            ("teacher", "teacher_model"),
+            ("teacher_games", "teacher_games"),
+            ("teacher_frac", "teacher_frac"),
+            ("league_frac", "league_frac"),
+            ("ema_decay", "ema_decay"),
+            ("no_surrender_games", "no_surrender_games"),
+            ("no_surrender_frac", "no_surrender_frac"),
+            ("q_noise_min", "q_noise_min"),
+            ("q_noise_max", "q_noise_max"),
+            ("eps_start", "epsilon_start"),
+            ("eps_end", "epsilon_end"),
+            ("eval_minutes", "eval_every_minutes"),
+            ("eval_deals", "eval_deals"),
+            ("device", "device"),
+            ("learner_threads", "learner_threads"),
+            ("games_per_actor", "games_per_actor"),
+            ("send_games", "send_games"),
+            ("replay", "replay_ratio"),
+            ("seed", "seed"),
+        ):
             v = getattr(args, k)
             if v is not None:
                 setattr(cfg, attr, v)
         if not args.config and not args.name:
             cfg.name = time.strftime("run-%Y%m%d-%H%M%S")
-        run_dir = os.path.dirname(os.path.abspath(args.config)) if args.config else \
-            os.path.join(args.runs_dir, cfg.name)
+        run_dir = (
+            os.path.dirname(os.path.abspath(args.config))
+            if args.config
+            else os.path.join(args.runs_dir, cfg.name)
+        )
         os.makedirs(run_dir, exist_ok=True)
         train(cfg, run_dir)
     elif args.cmd == "eval":

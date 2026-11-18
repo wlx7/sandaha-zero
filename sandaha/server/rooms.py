@@ -318,7 +318,7 @@ class Room:
     def _eval_extra(self, coach, g, chosen):
         from ..ai import features as F
         import numpy as np
-        phase, st, A = F.encode(g, g.to_act, [chosen])
+        phase, st, A = F.encode(g, g.to_act, [chosen], coach.model.feat_ver)
         out = coach.model.q(phase, st, A)[0]
         return {"action": chosen, "label": describe_action(phase, chosen), "exp_score": float(out[0] * 9),
                 "win_prob": float(1 / (1 + np.exp(-out[1]))), "xian_points": float(out[2] * 400)}

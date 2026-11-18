@@ -124,23 +124,25 @@ def component_beatable(kind, cards, top, hand, ctx) -> bool:
     return any(ctx.pos[tr[0]] < top for tr in tractors_from_pairs(pairs, ctx, k))
 
 
-def safe_throw(hand, unseen, ctx) -> tuple | None:
+def safe_throw(hand, unseen, ctx, opp_trump_pair: bool = True) -> tuple | None:
     """Largest trump throw whose every component is provably unbeatable given the
-    cards this player has not seen (``unseen`` counts, conservative)."""
+    cards opponents could possibly hold (``unseen`` counts, conservative)."""
     cnt = {t: hand[t] for t in range(NUM_TYPES) if hand[t] and ctx.cls[t] == TRUMP_CLASS}
     if not cnt:
         return None
     safe = []
     for kind, cards in decompose(cnt, ctx):
         top = min(ctx.pos[t] for t in cards)
-        if not component_beatable(kind, cards, top, unseen, ctx):
+        if kind != SINGLE and not opp_trump_pair:
+            safe.append(cards)
+        elif not component_beatable(kind, cards, top, unseen, ctx):
             safe.append(cards)
     if len(safe) < 2:
         return None
     return tuple(sorted(t for c in safe for t in c))
 
 
-def lead_moves(hand, ctx: TrumpContext, unseen=None, allow_throw=True):
+def lead_moves(hand, ctx: TrumpContext, unseen=None, allow_throw=True, opp_trump_pair: bool = True):
     moves = []
     for c in range(5):
         hc = _hand_class(hand, ctx, c)
@@ -154,7 +156,7 @@ def lead_moves(hand, ctx: TrumpContext, unseen=None, allow_throw=True):
         for tr in tractors_from_pairs(pairs, ctx):
             moves.append(tuple(sorted(t for t in tr for _ in (0, 1))))
     if allow_throw and unseen is not None:
-        st = safe_throw(hand, unseen, ctx)
+        st = safe_throw(hand, unseen, ctx, opp_trump_pair=opp_trump_pair)
         if st is not None and st not in moves:
             moves.append(st)
     return moves
@@ -238,11 +240,21 @@ def _greedy_fill(items, f, key):
 
 def _sample_fills(items, f, rng, n, ctx):
     pool = []
+    cnt_map = {}
+    cls_len = [0] * 5
     for t, c in items:
         pool += [t] * c
+        cnt_map[t] = c
+        cls_len[ctx.cls[t]] += c
     res = {_greedy_fill(items, f, lambda t: _weakness_key(t, ctx))}
     res.add(_greedy_fill(items, f, lambda t: (-POINTS[t], ctx.is_trump[t], -ctx.pos[t])))
     res.add(_greedy_fill(items, f, lambda t: (not ctx.is_trump[t], ctx.pos[t])))
+    # tactical fills: preserve pairs, create short side-suit voids, feed points without breaking trump pairs
+    res.add(_greedy_fill(items, f, lambda t: (ctx.is_trump[t], POINTS[t] > 0, cnt_map[t] == 2, -ctx.pos[t])))
+    res.add(_greedy_fill(items, f, lambda t: (
+        ctx.is_trump[t], POINTS[t] > 0, ctx.pos[t] == 0, cls_len[ctx.cls[t]], cnt_map[t] == 2, -ctx.pos[t]
+    )))
+    res.add(_greedy_fill(items, f, lambda t: (-POINTS[t], ctx.is_trump[t], cnt_map[t] == 2, -ctx.pos[t])))
     for _ in range(n * 3):
         if len(res) >= n:
             break

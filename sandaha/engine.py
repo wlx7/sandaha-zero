@@ -46,6 +46,9 @@ class Game:
         self.to_act = first_bidder
         self.passed = [False] * 4
         self.bid_history: list[tuple[int, int]] = []  # (seat, value) value 0 = pass
+        self.seat_min_bid = [0] * 4
+        self.seat_bids = [0] * 4
+        self.passed_unforced = [False] * 4
         self.best_bid: int | None = None
         self.best_bidder: int | None = None
         self.banker: int | None = None
@@ -58,9 +61,11 @@ class Game:
         self.lead_shape = None
         self.leader: int | None = None
         self.xian_points = 0
+        self.played_points = 0
         self.played = [[0] * NUM_TYPES for _ in range(4)]
         self.played_total = [0] * NUM_TYPES
         self.void = [[False] * 5 for _ in range(4)]
+        self.pair_void = [[False] * 5 for _ in range(4)]
         self.result: dict | None = None
         self.events: list[dict] = []   # human-readable log for the UI
 
@@ -122,9 +127,15 @@ class Game:
             raise IllegalMove("非法叫分")
         self.bid_history.append((s, v))
         if v == PASS:
+            r = self.rules
+            if (r.force_enabled and self.best_bid is not None and self.best_bidder != s
+                    and self.best_bid > r.force_bid):
+                self.passed_unforced[s] = True
             self.passed[s] = True
             self.events.append({"type": "bid", "seat": s, "value": 0})
         else:
+            self.seat_min_bid[s] = v
+            self.seat_bids[s] += 1
             self.best_bid, self.best_bidder = v, s
             self.events.append({"type": "bid", "seat": s, "value": v})
         active = [i for i in range(4) if not self.passed[i]]
@@ -180,8 +191,21 @@ class Game:
     def legal_plays(self, s=None):
         s = self.to_act if s is None else s
         if not self.cur:
-            unseen = self.unseen_for(s) if self.rules.allow_trump_throw else None
-            return M.lead_moves(self.hands[s], self.ctx, unseen, self.rules.allow_trump_throw)
+            unseen = None
+            opp_trump_pair = True
+            if self.rules.allow_trump_throw:
+                others_with_trump = [
+                    o for o in range(4)
+                    if o != s and self.hand_size(o) > 0 and not self.void[o][TRUMP_CLASS]
+                ]
+                if not others_with_trump:
+                    unseen = [0] * NUM_TYPES
+                    opp_trump_pair = False
+                else:
+                    unseen = self.unseen_for(s)
+                    opp_trump_pair = any(not self.pair_void[o][TRUMP_CLASS] for o in others_with_trump)
+            return M.lead_moves(self.hands[s], self.ctx, unseen, self.rules.allow_trump_throw,
+                                opp_trump_pair=opp_trump_pair)
         return M.follow_moves(self.hands[s], self.lead_shape, self.ctx, self.rng)
 
     def check_play(self, s, cards) -> str | None:
@@ -211,10 +235,18 @@ class Game:
             lc = self.lead_shape.cls
             if any(self.ctx.cls[t] != lc for t in cards):
                 self.void[s][lc] = True
+                self.pair_void[s][lc] = True
+            elif self.lead_shape.kind == M.PAIR and cards[0] != cards[1]:
+                self.pair_void[s][lc] = True
+            elif self.lead_shape.kind in (M.TRACTOR, M.THROW) and self.lead_shape.pairs >= 1:
+                played_pairs = sum(1 for k in M.counts_of(cards).values() if k == 2)
+                if played_pairs < self.lead_shape.pairs:
+                    self.pair_void[s][lc] = True
         for t in cards:
             self.hands[s][t] -= 1
             self.played[s][t] += 1
             self.played_total[t] += 1
+            self.played_points += POINTS[t]
         self.cur.append((s, cards))
         self.events.append({"type": "play", "seat": s, "cards": list(cards)})
         if len(self.cur) < 4:

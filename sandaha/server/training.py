@@ -101,7 +101,7 @@ def run_detail(name):
             "metrics": _read_jsonl(os.path.join(d, "metrics.jsonl")),
             "evals": _read_jsonl(os.path.join(d, "evals.jsonl")),
             "checkpoints": ckpts, "log": log,
-            "params": param_count(cfg.arch())}
+            "params": param_count(cfg.arch(), cfg.arch_type, cfg.feat_ver)}
 
 
 def _run_dir(name):

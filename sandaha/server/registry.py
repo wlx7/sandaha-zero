@@ -1,34 +1,76 @@
-"""Discover and cache playable models."""
+"""Discover and cache playable models (supports source tree, PyInstaller exe, and Android)."""
 from __future__ import annotations
 
 import glob
 import json
 import os
+import sys
 import threading
-import time
 
 from ..ai import AIAgent, Model
 from ..bots import RandomBot, RuleBot
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+BUNDLE_ROOT = os.path.abspath(
+    getattr(sys, "_MEIPASS", os.path.join(os.path.dirname(__file__), "..", ".."))
+)
+if getattr(sys, "frozen", False):
+    ROOT = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    ROOT = BUNDLE_ROOT
+
 MODELS_DIR = os.path.join(ROOT, "models")
+BUNDLE_MODELS_DIR = os.path.join(BUNDLE_ROOT, "models")
 RUNS_DIR = os.path.join(ROOT, "runs")
 
 _cache: dict[str, Model] = {}
 _lock = threading.Lock()
 
 
+def set_root(root_dir: str):
+    """Override ROOT / MODELS_DIR / RUNS_DIR (used by embedded Android runtime)."""
+    global ROOT, MODELS_DIR, RUNS_DIR
+    ROOT = os.path.abspath(root_dir)
+    MODELS_DIR = os.path.join(ROOT, "models")
+    RUNS_DIR = os.path.join(ROOT, "runs")
+
+
+def _allowed_roots() -> tuple[str, ...]:
+    if ROOT == BUNDLE_ROOT:
+        return (ROOT,)
+    return (ROOT, BUNDLE_ROOT)
+
+
 def rel(path):
-    try:
-        return os.path.relpath(path, ROOT).replace("\\", "/")
-    except ValueError:
-        return path
+    ap = os.path.abspath(path)
+    for base in _allowed_roots():
+        if ap.startswith(base):
+            try:
+                return os.path.relpath(ap, base).replace("\\", "/")
+            except ValueError:
+                pass
+    return path.replace("\\", "/")
+
+
+def _resolve_model_file(path: str) -> str:
+    if os.path.isabs(path) and os.path.exists(path):
+        return os.path.abspath(path)
+    for base in _allowed_roots():
+        cand = os.path.abspath(os.path.join(base, path))
+        if os.path.exists(cand):
+            return cand
+    return os.path.abspath(os.path.join(ROOT, path))
 
 
 def list_models():
     out = []
-    for p in sorted(glob.glob(os.path.join(MODELS_DIR, "*.npz"))):
-        out.append(_info(p, "models"))
+    seen_names = set()
+    for mdir in (MODELS_DIR,) if MODELS_DIR == BUNDLE_MODELS_DIR else (MODELS_DIR, BUNDLE_MODELS_DIR):
+        for p in sorted(glob.glob(os.path.join(mdir, "*.npz"))):
+            bn = os.path.basename(p)
+            if bn in seen_names:
+                continue
+            seen_names.add(bn)
+            out.append(_info(p, "models"))
     for p in sorted(glob.glob(os.path.join(RUNS_DIR, "*", "final.npz"))):
         out.append(_info(p, "run"))
     for p in sorted(glob.glob(os.path.join(RUNS_DIR, "*", "checkpoints", "*.npz")))[-200:]:
@@ -58,18 +100,21 @@ def _info(path, kind):
 
 
 def default_model_path():
-    pref = os.path.join(MODELS_DIR, "sandaha-best.npz")
-    if os.path.exists(pref):
-        return rel(pref)
-    ms = sorted(glob.glob(os.path.join(MODELS_DIR, "*.npz")), key=os.path.getmtime)
-    return rel(ms[-1]) if ms else None
+    for mdir in (MODELS_DIR, BUNDLE_MODELS_DIR):
+        pref = os.path.join(mdir, "sandaha-best.npz")
+        if os.path.exists(pref):
+            return rel(pref)
+    for mdir in (MODELS_DIR, BUNDLE_MODELS_DIR):
+        ms = sorted(glob.glob(os.path.join(mdir, "*.npz")), key=os.path.getmtime)
+        if ms:
+            return rel(ms[-1])
+    return None
 
 
 def load_model(path) -> Model:
     path = path[:-7] if path.endswith("?search") else path
-    full = path if os.path.isabs(path) else os.path.join(ROOT, path)
-    full = os.path.abspath(full)
-    if not full.startswith(ROOT) or not full.endswith(".npz"):
+    full = _resolve_model_file(path)
+    if not any(full.startswith(base) for base in _allowed_roots()) or not full.endswith(".npz"):
         raise ValueError("invalid model path")
     with _lock:
         m = _cache.get(full)
