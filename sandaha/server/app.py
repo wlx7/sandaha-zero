@@ -16,7 +16,7 @@ from .. import __version__
 from ..engine import IllegalMove
 from ..rules import Rules
 from . import registry
-from .rooms import BATTLE, TEACH, Room
+from .rooms import BATTLE, TEACH, Room, destroy_room
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
 
@@ -348,6 +348,19 @@ async def handle(client: Client, msg: dict):
         client.room_id = r.id
         await r.broadcast()
         await hub.push_rooms()
+    elif op == "close_room":
+        target = hub.rooms.get(msg.get("room")) if msg.get("room") else room
+        if target is None:
+            await client.send({"op": "rooms", "rooms": hub.room_list()})
+            return
+        if not target.can_manage(client.id):
+            raise IllegalMove("只有房主可以结束该房间")
+        await destroy_room(hub, target, client.id)
+    elif op == "close_all_rooms":
+        targets = [r for r in list(hub.rooms.values()) if r.can_manage(client.id)]
+        for t in targets:
+            await destroy_room(hub, t, client.id)
+        await client.send({"op": "rooms", "rooms": hub.room_list()})
     elif room is None:
         raise IllegalMove("你不在房间中")
     elif op == "leave_room":
@@ -374,7 +387,7 @@ async def handle(client: Client, msg: dict):
         await room.broadcast()
         await hub.push_rooms()
     elif op == "set_seat":
-        if client.id != room.host_id:
+        if not room.can_manage(client.id):
             raise IllegalMove("只有房主可以设置座位")
         if room.status == "playing":
             raise IllegalMove("对局进行中不能修改座位")
@@ -394,18 +407,35 @@ async def handle(client: Client, msg: dict):
     elif op == "start" or op == "next_hand":
         if room.status == "playing":
             raise IllegalMove("对局进行中")
-        if op == "start" and client.id != room.host_id:
+        if op == "start" and not room.can_manage(client.id):
             raise IllegalMove("只有房主可以开始")
         async with room.lock:
             await room.start_hand()
         await hub.push_rooms()
+    elif op == "restart_hand":
+        if not room.can_manage(client.id):
+            raise IllegalMove("只有房主可以重开本局")
+        async with room.lock:
+            await room.restart_hand()
+        await hub.push_rooms()
+    elif op == "abort_hand":
+        if not room.can_manage(client.id):
+            raise IllegalMove("只有房主可以结束本局")
+        async with room.lock:
+            await room.abort_hand()
+        await hub.push_rooms()
+    elif op == "reset_scores":
+        if not room.can_manage(client.id):
+            raise IllegalMove("只有房主可以清零总分")
+        async with room.lock:
+            await room.reset_scores()
     elif op == "action":
         await room.human_action(client.id, msg)
     elif op == "hint":
         c = await room.hint(client.id)
         await client.send({"op": "hint", "comment": c})
     elif op == "settings":
-        if client.id != room.host_id:
+        if not room.can_manage(client.id):
             raise IllegalMove("只有房主可以修改设置")
         if "ai_delay" in msg:
             room.ai_delay = max(0.0, min(5.0, float(msg["ai_delay"])))

@@ -91,7 +91,50 @@ def test_lite_server_http_and_websocket():
         _ws_send_masked(s, {"op": "hello", "name": "Tester"})
         m1 = _ws_recv(s)
         assert m1["op"] == "welcome" and m1["name"] == "Tester"
+        cid = m1["client_id"]
         m2 = _ws_recv(s)
         assert m2["op"] == "rooms"
+
+        # Create a 1-human + 3-AI room, test abort_hand, restart_hand, leave_room, and close_room
+        _ws_send_masked(s, {
+            "op": "create_room",
+            "mode": "battle",
+            "ai_delay": 2.0,
+            "seats": [{"kind": "me"}, {"kind": "ai", "model": "rule"}, {"kind": "ai", "model": "rule"}, {"kind": "ai", "model": "rule"}],
+        })
+        st1 = _ws_recv(s)
+        assert st1["op"] == "state" and st1["can_manage"] is True
+        rid = st1["room"]["id"]
+        assert st1["room"]["host_id"] == cid
+        assert st1["room"]["seats"][0]["client_id"] == cid
+
+        # Drain autostart state broadcast
+        st2 = _ws_recv(s)
+        assert st2["op"] == "state" and st2["phase"] == "bid" and st2["hand_no"] == 1
+
+        # Abort hand -> returns to waiting state
+        _ws_send_masked(s, {"op": "abort_hand"})
+        st_abort = _ws_recv(s)
+        assert st_abort["op"] == "state" and st_abort.get("phase") is None and st_abort["room"]["status"] == "waiting"
+
+        # Restart hand -> starts fresh hand #1
+        _ws_send_masked(s, {"op": "restart_hand"})
+        st_res = _ws_recv(s)
+        assert st_res["op"] == "state" and st_res["phase"] == "bid" and st_res["hand_no"] == 1
+
+        # Leave room temporarily -> room still listed in lobby with host_id
+        _ws_send_masked(s, {"op": "leave_room"})
+        r_leave = _ws_recv(s)
+        while r_leave["op"] != "rooms":
+            r_leave = _ws_recv(s)
+        assert any(r["id"] == rid and r["host_id"] == cid for r in r_leave["rooms"])
+
+        # Close room from lobby -> room permanently deleted
+        _ws_send_masked(s, {"op": "close_room", "room": rid})
+        for _ in range(5):
+            r_close = _ws_recv(s)
+            if r_close["op"] == "rooms" and not any(r["id"] == rid for r in r_close["rooms"]):
+                break
+        assert not any(r["id"] == rid for r in r_close["rooms"])
     finally:
         s.close()

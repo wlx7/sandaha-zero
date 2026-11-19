@@ -43,6 +43,7 @@ class SeatInfo:
         if self.kind == "human":
             c = clients.get(self.client_id)
             d["connected"] = bool(c and c.ws is not None)
+            d["client_id"] = self.client_id
         return d
 
 
@@ -105,10 +106,55 @@ class Room:
         except Exception:
             return None
 
+    def can_manage(self, client_id) -> bool:
+        if client_id and client_id == self.host_id:
+            return True
+        other_online = [
+            s for s in self.seats
+            if s.kind == "human" and s.client_id != client_id
+            and s.client_id in self.hub.clients and self.hub.clients[s.client_id].ws is not None
+        ]
+        if self.seat_of(client_id) is not None and not other_online:
+            return True
+        any_human_online = any(
+            s.kind == "human" and s.client_id in self.hub.clients and self.hub.clients[s.client_id].ws is not None
+            for s in self.seats
+        )
+        return not any_human_online
+
     def summary(self):
         return {"id": self.id, "name": self.name, "mode": self.mode, "status": self.status,
                 "seats": [s.public(self.hub.clients) for s in self.seats], "hand_no": self.hand_no,
+                "host_id": self.host_id,
                 "host": self.hub.clients[self.host_id].name if self.host_id in self.hub.clients else ""}
+
+    async def restart_hand(self):
+        if self._task and not self._task.done():
+            self._task.cancel()
+        self._task = None
+        self.deadline = None
+        if self.status == "playing" and self.hand_no > 0:
+            self.hand_no -= 1
+        await self.start_hand()
+
+    async def abort_hand(self):
+        if self._task and not self._task.done():
+            self._task.cancel()
+        self._task = None
+        self.deadline = None
+        if self.status == "playing" and self.hand_no > 0:
+            self.hand_no -= 1
+        self.game = None
+        self.status = "waiting"
+        self.comments = []
+        await self.broadcast()
+
+    async def reset_scores(self):
+        self.totals = [0, 0, 0, 0]
+        self.past_hands = []
+        if self.status != "playing":
+            self.hand_no = 0
+        await self.broadcast()
 
     # --------------------------------------------------------------- flow --
     async def start_hand(self):
@@ -351,7 +397,8 @@ class Room:
         me = self.seat_of(client_id)
         g = self.game
         d = {"op": "state", "room": self.summary(), "my_seat": me, "mode": self.mode,
-             "is_host": client_id == self.host_id, "totals": self.totals,
+             "is_host": client_id == self.host_id, "can_manage": self.can_manage(client_id),
+             "ai_delay": self.ai_delay, "totals": self.totals,
              "past_hands": [{k: v for k, v in h.items() if k != "tricks"} for h in self.past_hands],
              "turn_seconds": self.turn_seconds, "now": time.time()}
         if g is None:
@@ -411,3 +458,25 @@ class Room:
     def cancel(self):
         if self._task and not self._task.done():
             self._task.cancel()
+
+
+async def destroy_room(hub, target: Room, initiator_id: str | None = None):
+    """Cancel and permanently remove a room, notifying all members."""
+    target.cancel()
+    hub.rooms.pop(target.id, None)
+    member_ids = set(target.members)
+    for s in target.seats:
+        if s.kind == "human" and s.client_id:
+            member_ids.add(s.client_id)
+    if initiator_id:
+        member_ids.add(initiator_id)
+    for cid in member_ids:
+        c = hub.clients.get(cid)
+        if not c:
+            continue
+        was_in_room = c.room_id == target.id
+        if was_in_room:
+            c.room_id = None
+        if c.ws is not None and was_in_room:
+            await c.send({"op": "room_closed", "room": target.id, "msg": "牌局已结束"})
+    await hub.push_rooms()

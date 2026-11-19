@@ -21,6 +21,16 @@ export function mountPlay(app) {
   let resizeT = null;
 
   offs.push(on('rooms', (m) => { st.rooms = m.rooms; if (!st.view || !st.view.room) render(); }));
+  offs.push(on('room_closed', (m) => {
+    if (!m.room || (st.view && st.view.room && st.view.room.id === m.room)) {
+      st.view = null;
+      st.sel.clear();
+      const mr = $('#modal-root');
+      if (mr) mr.innerHTML = '';
+      toast(m.msg || '牌局已结束');
+      render();
+    }
+  }));
   offs.push(on('state', (m) => {
     st.timeOffset = m.now - Date.now() / 1000;
     const prevPhase = st.view && st.view.phase;
@@ -44,6 +54,118 @@ export function mountPlay(app) {
   window.addEventListener('resize', onResize);
   timerInt = setInterval(tick, 250);
 
+  function canManageRoomSummary(r) {
+    if (r.host_id && r.host_id === me.id) return true;
+    const isMine = r.seats.some((s) => s.kind === 'human' && s.client_id === me.id);
+    const otherOnline = r.seats.some((s) => s.kind === 'human' && s.client_id !== me.id && s.connected);
+    if (isMine && !otherOnline) return true;
+    const anyHumanOnline = r.seats.some((s) => s.kind === 'human' && s.connected);
+    return !anyHumanOnline;
+  }
+
+  function promptLeaveRoom() {
+    const v = st.view;
+    if (!v || !v.room) return;
+    const canManage = Boolean(v.can_manage || v.is_host);
+    if (canManage) {
+      const m = modal(h('div', {},
+        h('h2', {}, '退出或结束牌局'),
+        h('div', { class: 'hint', style: { margin: '6px 0 14px' } },
+          '选择「结束牌局」将直接解散并清理当前房间；选择「暂时离开」会保留房间，稍后可在大厅点击「回到牌局」继续。'),
+        h('div', { class: 'row', style: { justifyContent: 'flex-end' } },
+          h('button', { class: 'btn ghost', onclick: () => m.close() }, '继续对局'),
+          h('button', { class: 'btn', onclick: () => {
+            m.close();
+            send({ op: 'leave_room' });
+            st.view = null;
+            render();
+          } }, '暂时离开'),
+          h('button', { class: 'btn danger', onclick: () => {
+            m.close();
+            send({ op: 'close_room', room: v.room.id });
+            st.view = null;
+            render();
+          } }, '结束牌局'))));
+      return;
+    }
+    if (v.phase && v.phase !== 'over' && v.my_seat !== null && v.my_seat !== undefined) {
+      const m = modal(h('div', {},
+        h('h2', {}, '离开房间'),
+        h('div', { style: { margin: '8px 0 14px' } }, '对局正在进行中，确定离开当前房间？'),
+        h('div', { class: 'row', style: { justifyContent: 'flex-end' } },
+          h('button', { class: 'btn ghost', onclick: () => m.close() }, '取消'),
+          h('button', { class: 'btn danger', onclick: () => {
+            m.close();
+            send({ op: 'leave_room' });
+            st.view = null;
+            render();
+          } }, '确定离开'))));
+      return;
+    }
+    send({ op: 'leave_room' });
+    st.view = null;
+    render();
+  }
+
+  function showManageModal() {
+    const v = st.view;
+    if (!v || !v.room) return;
+    const curDelay = v.ai_delay ?? st.lobby.ai_delay ?? 0.9;
+    const delaySlider = h('input', { type: 'range', min: 0, max: 3, step: 0.1, value: curDelay, style: { flex: '1' } });
+    const delayTxt = h('span', { class: 'hint', style: { minWidth: '34px', textAlign: 'right' } }, `${fmt(curDelay, 1)}s`);
+    delaySlider.addEventListener('input', () => { delayTxt.textContent = `${fmt(+delaySlider.value, 1)}s`; });
+    delaySlider.addEventListener('change', () => {
+      st.lobby.ai_delay = +delaySlider.value;
+      store.set('sdh.lobby', st.lobby);
+      send({ op: 'settings', ai_delay: +delaySlider.value });
+    });
+
+    const btnGrid = h('div', { class: 'manage-grid' });
+    let mRef = null;
+    if (v.phase && v.phase !== 'over') {
+      btnGrid.append(h('button', { class: 'btn primary', onclick: () => { mRef.close(); send({ op: 'restart_hand' }); } }, '重开本局（重新发牌）'));
+    }
+    if (v.phase) {
+      btnGrid.append(h('button', { class: 'btn', onclick: () => { mRef.close(); send({ op: 'abort_hand' }); } }, '结束本局（调整座位 / AI）'));
+    }
+    const hasScore = (v.hand_no > 0) || (v.totals && v.totals.some((x) => x !== 0));
+    if (hasScore) {
+      btnGrid.append(h('button', { class: 'btn', onclick: () => { mRef.close(); send({ op: 'reset_scores' }); toast('累计总分已清零'); } }, '清零累计总分'));
+    }
+    btnGrid.append(h('button', { class: 'btn danger', onclick: () => {
+      mRef.close();
+      send({ op: 'close_room', room: v.room.id });
+      st.view = null;
+      render();
+    } }, '结束并解散牌局'));
+
+    mRef = modal(h('div', {},
+      h('h2', {}, '牌局管理'),
+      h('div', { class: 'row', style: { margin: '8px 0 12px', flexWrap: 'nowrap' } },
+        h('span', { class: 'hint' }, 'AI 出牌间隔'), delaySlider, delayTxt),
+      btnGrid,
+      h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } },
+        h('button', { class: 'btn ghost', onclick: () => mRef.close() }, '关闭'))));
+  }
+
+  function showSeatConfigModal(seatIdx) {
+    const v = st.view;
+    if (!v || !v.room) return;
+    const cur = v.room.seats[seatIdx];
+    const msel = modelOptions(cur && cur.model ? cur.model : st.defaultModel);
+    let mRef = null;
+    mRef = modal(h('div', {},
+      h('h2', {}, `设置 ${seatIdx + 1} 号位`),
+      h('div', { class: 'manage-grid', style: { marginTop: '10px' } },
+        h('button', { class: 'btn primary', onclick: () => { mRef.close(); send({ op: 'set_seat', seat: seatIdx, kind: 'me' }); } }, '我坐这里（本机）'),
+        h('div', { class: 'row', style: { flexWrap: 'nowrap' } },
+          msel,
+          h('button', { class: 'btn', onclick: () => { mRef.close(); send({ op: 'set_seat', seat: seatIdx, kind: 'ai', model: msel.value }); } }, '设为该 AI')),
+        v.mode === 'battle' ? h('button', { class: 'btn', onclick: () => { mRef.close(); send({ op: 'set_seat', seat: seatIdx, kind: 'open' }); } }, '设为空位（等待玩家加入）') : null),
+      h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } },
+        h('button', { class: 'btn ghost', onclick: () => mRef.close() }, '取消'))));
+  }
+
   window.__sdhPlayBack = () => {
     if (st.panel) {
       st.panel = null;
@@ -52,13 +174,7 @@ export function mountPlay(app) {
       return true;
     }
     if (st.view && st.view.room) {
-      const v = st.view;
-      if (v.phase === 'play' && v.my_seat !== null && !confirm('对局进行中，确定离开房间？')) {
-        return true;
-      }
-      send({ op: 'leave_room' });
-      st.view = null;
-      render();
+      promptLeaveRoom();
       return true;
     }
     return false;
@@ -152,26 +268,46 @@ export function mountPlay(app) {
     } }, L.mode === 'teach' ? '开始教学局' : '创建房间');
 
     const roomList = h('div', { class: 'list' });
-    if (!st.rooms.length) roomList.append(h('div', { class: 'empty' }, '暂无房间。可创建房间后让局域网内其他设备加入。'));
+    if (!st.rooms.length) roomList.append(h('div', { class: 'empty' }, '暂无进行中的牌局。可在左侧新建对局，或让局域网设备扫码加入。'));
     for (const r of st.rooms) {
       const open = r.seats.filter((s) => s.kind === 'open').length;
+      const isMine = r.seats.some((s) => s.kind === 'human' && s.client_id === me.id);
+      const canManage = canManageRoomSummary(r);
+      const joinLabel = isMine ? '回到牌局' : (open ? '加入' : '观战');
+      const joinCls = (isMine || open) ? 'btn sm primary' : 'btn sm';
       roomList.append(h('div', { class: 'room-item' },
         h('div', { class: 'meta' }, h('b', {}, r.name), ' ',
+          isMine ? h('span', { class: 'tag gold' }, '我的牌局') : null, isMine ? ' ' : null,
           h('span', { class: 'tag ' + (r.mode === 'teach' ? 'gold' : 'green') }, r.mode === 'teach' ? '教学' : '对战'), ' ',
           h('span', { class: 'tag' }, r.status === 'waiting' ? `等待中 · 空位 ${open}` : `第 ${r.hand_no} 局`),
           h('div', { class: 'hint' }, r.seats.map((s) => s.kind === 'open' ? '空位' : s.name).join(' · '))),
-        h('button', { class: 'btn sm', onclick: () => send({ op: 'join_room', room: r.id }) }, open ? '加入' : '观战')));
+        h('div', { class: 'row', style: { flexWrap: 'nowrap', gap: '6px' } },
+          h('button', { class: joinCls, onclick: () => send({ op: 'join_room', room: r.id }) }, joinLabel),
+          canManage ? h('button', { class: 'btn sm danger', onclick: () => send({ op: 'close_room', room: r.id }) }, '结束') : null)));
     }
-    app.append(h('div', { class: 'page' },
+    const closableCount = st.rooms.filter(canManageRoomSummary).length;
+    app.append(h('div', { class: 'page lobby-page' },
       h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => { location.hash = '#/'; } }, '← 首页'),
         h('h2', {}, '对弈大厅'), h('span', { class: 'hint' }, `昵称：${me.name}`),
         h('button', { class: 'btn sm ghost', onclick: showRules }, '规则')),
       h('div', { class: 'grid2 lobby-grid' },
-        h('div', { class: 'card-box' }, h('h3', {}, '新建对局'), h('div', { class: 'row', style: { marginBottom: '10px' } }, modeSeg),
+        h('div', { class: 'card-box' }, h('h3', {}, '新建对局'), h('div', { class: 'row lobby-top-row', style: { marginBottom: '10px' } }, modeSeg, createBtn),
           ...seatRows,
-          h('div', { class: 'form', style: { marginTop: '8px' } }, h('label', {}, 'AI 出牌间隔'), h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, delay, delayLbl)),
-          adv, h('div', { class: 'row', style: { marginTop: '10px' } }, createBtn)),
-        h('div', { class: 'card-box' }, h('h3', {}, '加入房间', h('button', { class: 'btn sm ghost', onclick: () => send({ op: 'list_rooms' }) }, '刷新')), roomList))));
+          h('div', { class: 'form lobby-delay-row', style: { marginTop: '8px' } }, h('label', {}, 'AI 出牌间隔'), h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, delay, delayLbl)),
+          adv),
+        h('div', { class: 'card-box' },
+          h('h3', {},
+            h('span', { style: { marginRight: 'auto' } }, '牌局列表'),
+            h('button', { class: 'btn sm ghost', onclick: () => send({ op: 'list_rooms' }) }, '刷新'),
+            closableCount > 1 ? h('button', { class: 'btn sm danger', onclick: () => {
+              const m = modal(h('div', {},
+                h('h2', {}, '全部结束'),
+                h('div', { style: { margin: '8px 0 14px' } }, `确定结束并清理当前 ${closableCount} 个牌局房间？`),
+                h('div', { class: 'row', style: { justifyContent: 'flex-end' } },
+                  h('button', { class: 'btn ghost', onclick: () => m.close() }, '取消'),
+                  h('button', { class: 'btn danger', onclick: () => { m.close(); send({ op: 'close_all_rooms' }); } }, '全部结束'))));
+            } }, '全部结束') : null),
+          roomList))));
   }
 
   // ======================================================== table =====
@@ -213,8 +349,12 @@ export function mountPlay(app) {
     if (voidSuits.length) sub.append(h('span', { class: 'tag', title: '已知缺门' }, '缺' + voidSuits.join('')));
     const timer = active && v.deadline ? h('div', { class: 'timer', 'data-deadline': v.deadline }, h('i', {})) : null;
     const box = h('div', { class: `seat ${cls}` }, av, h('div', { class: 'name', title: seatName(i) }, seatName(i)), sub, timer);
-    if (s.kind === 'open' && !v.phase) {
-      box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'take_seat', seat: i }) }, '坐这里'));
+    if (!v.phase) {
+      if (v.can_manage || v.is_host) {
+        box.append(h('button', { class: 'btn sm', onclick: () => showSeatConfigModal(i) }, s.kind === 'open' ? '安排座位' : '调整'));
+      } else if (s.kind === 'open') {
+        box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'take_seat', seat: i }) }, '坐这里'));
+      }
     }
     if (v.all_hands && st.reveal && i !== v.my_seat) {
       const mh = h('div', { class: 'mini-hand chips' }, v.all_hands[i].map((c) => chipEl(c, v.trump)));
@@ -300,12 +440,10 @@ export function mountPlay(app) {
       }, 'AI手牌'));
     }
     tools.append(h('button', { class: 'btn sm ghost', onclick: showRules }, '规则'));
-    tools.append(h('button', { class: 'btn sm ghost', onclick: () => {
-      if (v.phase === 'play' && v.my_seat !== null && !confirm('对局进行中，确定离开？')) return;
-      send({ op: 'leave_room' });
-      st.view = null;
-      render();
-    } }, '离开'));
+    if (v.can_manage || v.is_host) {
+      tools.append(h('button', { class: 'btn sm', onclick: showManageModal }, '管理'));
+    }
+    tools.append(h('button', { class: 'btn sm ghost', onclick: promptLeaveRoom }, '离开'));
     wrap.append(h('div', { class: 'topbar' }, info, tools));
 
     // ---- felt
@@ -384,7 +522,11 @@ export function mountPlay(app) {
     if (!v.phase) {
       const open = v.room.seats.filter((s) => s.kind === 'open').length;
       mid.append(h('div', { class: 'big' }, open ? `等待玩家 (${open} 空位)` : '准备开始'));
-      if (v.is_host && !open) mid.append(h('button', { class: 'btn primary', onclick: () => send({ op: 'start' }) }, '开始游戏'));
+      if ((v.can_manage || v.is_host) && !open) {
+        mid.append(h('button', { class: 'btn primary', onclick: () => send({ op: 'start' }) }, '开始发牌'));
+      } else if (v.can_manage || v.is_host) {
+        mid.append(h('div', { class: 'mid-sub' }, '点击各座位「安排座位」可设为 AI'));
+      }
       return mid;
     }
     if (v.phase === 'bid') {
@@ -471,7 +613,15 @@ export function mountPlay(app) {
       box.append(h('span', { class: 'msg' }, '底牌:'), h('span', { class: 'chips' }, (v.bottom || []).map((c) => chipEl(c, null))));
       for (const t of v.legal_trumps || []) {
         box.append(h('button', { class: 'btn' + (t === 5 ? ' danger' : ''), onclick: () => {
-          if (t === 5 && !confirm(`确定投降？庄分 ${v.contract}，投降按${v.contract >= 55 ? '下庄' : '小倒'}结算。`)) return;
+          if (t === 5) {
+            const m = modal(h('div', {},
+              h('h2', {}, '确定投降？'),
+              h('div', { style: { margin: '8px 0 14px' } }, `当前庄分 ${v.contract} 分，投降将按「${v.contract >= 55 ? '下庄' : '小倒'}」直接结算本局。`),
+              h('div', { class: 'row', style: { justifyContent: 'flex-end' } },
+                h('button', { class: 'btn ghost', onclick: () => m.close() }, '取消'),
+                h('button', { class: 'btn danger', onclick: () => { m.close(); send({ op: 'action', kind: 'trump', value: t }); } }, '确定投降'))));
+            return;
+          }
           send({ op: 'action', kind: 'trump', value: t });
         } }, TRUMP_NAMES[t]));
       }
@@ -672,8 +822,14 @@ export function mountPlay(app) {
         h('span', { class: 'hint' }, `累计 ${v.totals[i]}`)))),
       v.buried ? h('div', {}, h('div', { class: 'hint' }, '底牌'), h('div', { class: 'chips' }, v.buried.map((c) => chipEl(c, v.trump)))) : null);
     const m = modal(h('div', {}, content, h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '10px' } },
+      (v.can_manage || v.is_host) ? h('button', { class: 'btn danger', onclick: () => {
+        m.close();
+        send({ op: 'close_room', room: v.room.id });
+        st.view = null;
+        render();
+      } }, '结束牌局') : null,
       h('button', { class: 'btn', onclick: () => m.close() }, '关闭'),
-      (my !== null && my !== undefined) || v.is_host ? h('button', { class: 'btn primary', onclick: () => { m.close(); send({ op: 'next_hand' }); } }, '下一局') : null)));
+      (my !== null && my !== undefined) || v.is_host || v.can_manage ? h('button', { class: 'btn primary', onclick: () => { m.close(); send({ op: 'next_hand' }); } }, '下一局') : null)));
   }
 
   // ========================================================== timer =====
