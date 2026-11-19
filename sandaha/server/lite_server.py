@@ -397,8 +397,10 @@ async def _ws_session(ws: LiteWebSocket):
                 await handle(client, msg)
             except IllegalMove as e:
                 await client.send({"op": "error", "msg": str(e)})
-            except (KeyError, ValueError, TypeError) as e:
+            except (KeyError, ValueError, TypeError, FileNotFoundError) as e:
                 await client.send({"op": "error", "msg": f"请求错误: {e}"})
+            except Exception as e:
+                await client.send({"op": "error", "msg": f"操作失败: {e}"})
     except (EOFError, ConnectionError, asyncio.IncompleteReadError):
         pass
     finally:
@@ -419,7 +421,7 @@ def _http_response(writer: asyncio.StreamWriter, status: int, content_type: str,
         "Connection: close",
     ]
     if no_cache:
-        hdrs.append("Cache-Control: no-cache")
+        hdrs.append("Cache-Control: no-store, no-cache, must-revalidate")
     writer.write(("\r\n".join(hdrs) + "\r\n\r\n").encode("latin-1") + body)
 
 

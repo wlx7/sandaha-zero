@@ -19,7 +19,7 @@ A self-play reinforcement-learning AI for **San Da Ha (三打哈)**, the Hunan t
 
 Download from [**GitHub Releases**](https://github.com/wlx7/sandaha-zero/releases/latest):
 
-- **Windows (x64)**: download `SanDaHa-Zero-Windows-x64.exe` and double-click to launch (pure play & teaching edition with training stripped out; bundles both v2.0 `sandaha-best` and `sandaha-lite` models — no Python install needed).
+- **Windows (x64)**: download `SanDaHa-Zero-Windows-x64.exe` and double-click to launch (pure play & teaching edition with training stripped out; bundles both v2.2 `sandaha-best` and `sandaha-lite` models — no Python install needed).
 - **Android (`arm64-v8a` / `x86_64`)**: install `SanDaHa-Zero-Android.apk` to play offline or host LAN rooms right from your phone (immersive fullscreen WebView with non-scrolling landscape & portrait adaptation and full 16 KB page-size support for Android 15/16, powered by an embedded Python 3.13 + NumPy engine via Chaquopy 17).
 
 ### Option 2: Run from Source

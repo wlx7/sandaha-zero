@@ -105,7 +105,7 @@ app = FastAPI(title="SanDaHa Zero", version=__version__)
 async def no_cache(request, call_next):
     resp = await call_next(request)
     if request.url.path == "/" or request.url.path.startswith("/static"):
-        resp.headers["Cache-Control"] = "no-cache"
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     return resp
 
 
@@ -284,8 +284,10 @@ async def ws_endpoint(ws: WebSocket):
                 await handle(client, msg)
             except IllegalMove as e:
                 await client.send({"op": "error", "msg": str(e)})
-            except (KeyError, ValueError, TypeError) as e:
+            except (KeyError, ValueError, TypeError, FileNotFoundError) as e:
                 await client.send({"op": "error", "msg": f"请求错误: {e}"})
+            except Exception as e:
+                await client.send({"op": "error", "msg": f"操作失败: {e}"})
     except WebSocketDisconnect:
         pass
     finally:

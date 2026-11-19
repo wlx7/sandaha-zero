@@ -79,6 +79,7 @@ public class MainActivity extends Activity {
         ws.setBuiltInZoomControls(false);
         ws.setDisplayZoomControls(false);
         ws.setTextZoom(100);
+        ws.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {

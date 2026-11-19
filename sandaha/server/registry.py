@@ -140,10 +140,19 @@ def make_agent(spec: str, seed=None):
         return RuleBot(seed=seed)
     if spec == "random":
         return RandomBot(seed=seed)
-    if spec.endswith("?search"):
-        from ..ai.search import SearchAgent
-        return SearchAgent(load_model(spec[:-7]), seed=seed)
-    return AIAgent(load_model(spec), seed=seed)
+    try:
+        if spec.endswith("?search"):
+            from ..ai.search import SearchAgent
+            return SearchAgent(load_model(spec[:-7]), seed=seed)
+        return AIAgent(load_model(spec), seed=seed)
+    except (FileNotFoundError, ValueError, OSError):
+        fallback = default_model_path()
+        if fallback and fallback != spec and fallback + "?search" != spec:
+            try:
+                return AIAgent(load_model(fallback), seed=seed)
+            except Exception:
+                pass
+        return RuleBot(seed=seed)
 
 
 def agent_label(spec: str):

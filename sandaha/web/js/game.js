@@ -2,7 +2,7 @@
 import { $, api, fmt, h, modal, pct, store, toast } from './util.js';
 import { cardEl, chipEl, label, layoutHand, SUIT_SYM } from './cards.js';
 import { me, on, send } from './net.js';
-import { showRules } from './main.js';
+import { goHome, showRules } from './main.js';
 
 const TRUMP_NAMES = ['♠ 黑桃', '♥ 红桃', '♣ 梅花', '♦ 方块', '无主', '投降'];
 const PHASE_NAMES = { bid: '叫分', trump: '定主', bury: '埋底', play: '出牌', over: '结束' };
@@ -17,11 +17,18 @@ export function mountPlay(app) {
     lobby: store.get('sdh.lobby', { mode: 'battle', seats: ['me', 'ai', 'ai', 'ai'], models: [null, null, null, null], ai_delay: 0.9, rules: {} }),
   };
   const offs = [];
+  let alive = true;
   let timerInt = null;
   let resizeT = null;
+  let resultT = null;
 
-  offs.push(on('rooms', (m) => { st.rooms = m.rooms; if (!st.view || !st.view.room) render(); }));
+  offs.push(on('rooms', (m) => {
+    if (!alive) return;
+    st.rooms = m.rooms;
+    if (!st.view || !st.view.room) render();
+  }));
   offs.push(on('room_closed', (m) => {
+    if (!alive) return;
     if (!m.room || (st.view && st.view.room && st.view.room.id === m.room)) {
       st.view = null;
       st.sel.clear();
@@ -32,6 +39,7 @@ export function mountPlay(app) {
     }
   }));
   offs.push(on('state', (m) => {
+    if (!alive) return;
     st.timeOffset = m.now - Date.now() / 1000;
     const prevPhase = st.view && st.view.phase;
     st.view = m;
@@ -40,17 +48,27 @@ export function mountPlay(app) {
     render();
     if (m.phase === 'over' && m.result && st.shownResult !== m.hand_no) {
       st.shownResult = m.hand_no;
-      setTimeout(() => showResult(), prevPhase === 'over' ? 0 : 900);
+      clearTimeout(resultT);
+      resultT = setTimeout(() => { if (alive) showResult(); }, prevPhase === 'over' ? 0 : 900);
     }
   }));
-  offs.push(on('hint', (m) => showHint(m.comment)));
-  offs.push(on('welcome', () => send({ op: 'sync' })));
+  offs.push(on('hint', (m) => { if (alive) showHint(m.comment); }));
+  offs.push(on('welcome', () => { if (alive) send({ op: 'sync' }); }));
   offs.push(on('close', () => { /* reconnect handled by net */ }));
 
-  api('/api/models').then((r) => { st.models = r.models; st.defaultModel = r.default; if (!st.view || !st.view.room) render(); }).catch(() => {});
+  api('/api/models').then((r) => {
+    if (!alive) return;
+    st.models = r.models || [];
+    st.defaultModel = r.default;
+    if (!st.view || !st.view.room) render();
+  }).catch(() => {});
   send({ op: 'sync' });
 
-  const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(render, 100); };
+  const onResize = () => {
+    if (!alive) return;
+    clearTimeout(resizeT);
+    resizeT = setTimeout(() => { if (alive) render(); }, 100);
+  };
   window.addEventListener('resize', onResize);
   timerInt = setInterval(tick, 250);
 
@@ -64,6 +82,7 @@ export function mountPlay(app) {
   }
 
   function promptLeaveRoom() {
+    if (!alive) return;
     const v = st.view;
     if (!v || !v.room) return;
     const canManage = Boolean(v.can_manage || v.is_host);
@@ -108,6 +127,7 @@ export function mountPlay(app) {
   }
 
   function showManageModal() {
+    if (!alive) return;
     const v = st.view;
     if (!v || !v.room) return;
     const curDelay = v.ai_delay ?? st.lobby.ai_delay ?? 0.9;
@@ -167,6 +187,7 @@ export function mountPlay(app) {
   }
 
   window.__sdhPlayBack = () => {
+    if (!alive) return false;
     if (st.panel) {
       st.panel = null;
       store.set('sdh.panel', null);
@@ -181,11 +202,21 @@ export function mountPlay(app) {
   };
 
   function render() {
+    if (!alive) return;
     app.innerHTML = '';
     if (st.view && st.view.room) renderTable(); else renderLobby();
   }
 
   // ======================================================== lobby =====
+  function resolveModelSpec(spec) {
+    if (!spec) return st.defaultModel || null;
+    if (spec === 'rule' || spec === 'random') return spec;
+    if (!st.models.length) return spec;
+    const raw = spec.endsWith('?search') ? spec.slice(0, -7) : spec;
+    if (st.models.some((m) => m.path === raw)) return spec;
+    return st.defaultModel || 'rule';
+  }
+
   function modelOptions(selected) {
     const fmtLabel = (m) => {
       if (m.label === 'sandaha-best') return 'sandaha-best（最强主力）';
@@ -201,8 +232,8 @@ export function mountPlay(app) {
     const ck = st.models.filter((x) => x.kind === 'checkpoint').slice(-12);
     if (ck.length) opts.push(h('optgroup', { label: '训练检查点' }, ck.map((m) => h('option', { value: m.path }, m.label))));
     const sel = h('select', {}, opts);
-    sel.value = selected || st.defaultModel || 'rule';
-    if (!sel.value) sel.value = 'rule';
+    sel.value = resolveModelSpec(selected) || st.defaultModel || 'rule';
+    if (!sel.value) sel.value = (sel.options[0] && sel.options[0].value) || 'rule';
     return sel;
   }
 
@@ -268,12 +299,12 @@ export function mountPlay(app) {
     const createBtn = h('button', { class: 'btn primary', onclick: () => {
       const seats = [];
       for (let i = 0; i < 4; i++) {
-        if (L.mode === 'teach') seats.push(i === 0 ? { kind: 'me' } : { kind: 'ai', model: L.models[1] || st.defaultModel || 'rule' });
-        else if (L.seats[i] === 'ai') seats.push({ kind: 'ai', model: L.models[i] || st.defaultModel || 'rule' });
+        if (L.mode === 'teach') seats.push(i === 0 ? { kind: 'me' } : { kind: 'ai', model: resolveModelSpec(L.models[1]) });
+        else if (L.seats[i] === 'ai') seats.push({ kind: 'ai', model: resolveModelSpec(L.models[i]) });
         else seats.push({ kind: L.seats[i] });
       }
       send({ op: 'create_room', mode: L.mode, seats, ai_delay: L.ai_delay, rules: L.rules,
-        coach: L.models[1] || st.defaultModel, name: `${me.name} 的房间` });
+        coach: resolveModelSpec(L.models[1]), name: `${me.name} 的房间` });
     } }, L.mode === 'teach' ? '开始教学局' : '创建房间');
 
     const roomList = h('div', { class: 'list' });
@@ -296,7 +327,7 @@ export function mountPlay(app) {
     }
     const closableCount = st.rooms.filter(canManageRoomSummary).length;
     app.append(h('div', { class: 'page lobby-page' },
-      h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => { location.hash = '#/'; } }, '← 首页'),
+      h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => goHome() }, '← 首页'),
         h('h2', {}, '对弈大厅'), h('span', { class: 'hint' }, `昵称：${me.name}`),
         h('button', { class: 'btn sm ghost', onclick: showRules }, '规则')),
       h('div', { class: 'grid2 lobby-grid' },
@@ -692,6 +723,7 @@ export function mountPlay(app) {
   }
 
   function showHint(c) {
+    if (!alive) return;
     if (!c) { toast('暂无可用的 AI 模型'); return; }
     if (c.codes) { selectCodes(c.codes); toast(`AI 建议：${c.suggest}`, 4000); return; }
     const top = c.top || [];
@@ -828,6 +860,7 @@ export function mountPlay(app) {
 
   // ========================================================= result =====
   function showResult() {
+    if (!alive) return;
     const v = st.view;
     if (!v || !v.result) return;
     const r = v.result;
@@ -858,6 +891,7 @@ export function mountPlay(app) {
 
   // ========================================================== timer =====
   function tick() {
+    if (!alive) return;
     const now = Date.now() / 1000 + st.timeOffset;
     const total = (st.view && st.view.turn_seconds) || 30;
     for (const el of document.querySelectorAll('.timer[data-deadline]')) {
@@ -874,9 +908,15 @@ export function mountPlay(app) {
 
   render();
   return () => {
+    alive = false;
     window.__sdhPlayBack = null;
+    if (st.view && st.view.room) {
+      send({ op: 'leave_room' });
+    }
     offs.forEach((f) => f());
     clearInterval(timerInt);
+    clearTimeout(resizeT);
+    clearTimeout(resultT);
     window.removeEventListener('resize', onResize);
   };
 }

@@ -25,6 +25,25 @@ export function showRules() {
     h('button', { class: 'btn primary', onclick: () => m.close() }, '知道了'))));
 }
 
+export function navigate(targetHash) {
+  if (location.hash === targetHash) {
+    route();
+  } else {
+    location.hash = targetHash;
+  }
+}
+
+export function goHome() {
+  if (!location.hash || location.hash === '#' || location.hash === '#/') {
+    if (location.hash !== '#/') {
+      try { history.replaceState(null, '', '#/'); } catch {}
+    }
+    route();
+  } else {
+    location.hash = '#/';
+  }
+}
+
 let cachedInfo = null;
 async function loadInfo() {
   if (cachedInfo) return cachedInfo;
@@ -41,11 +60,13 @@ function enterPlayWithMode(nameVal, mode) {
   const lobby = store.get('sdh.lobby', { mode: 'battle', seats: ['me', 'ai', 'ai', 'ai'], models: [null, null, null, null], ai_delay: 0.9, rules: {} });
   lobby.mode = mode;
   store.set('sdh.lobby', lobby);
-  location.hash = '#/play';
+  navigate('#/play');
 }
 
-async function home(app) {
+async function home(app, isAlive) {
   const info = await loadInfo();
+  if (!isAlive()) return;
+  app.innerHTML = '';
   const canTrain = info.can_train !== false;
   const nameInput = h('input', { value: me.name, maxlength: 16, 'aria-label': '昵称', style: { width: '148px' } });
   nameInput.addEventListener('change', () => setName(nameInput.value));
@@ -54,9 +75,9 @@ async function home(app) {
   let choices;
   if (canTrain) {
     choices = h('div', { class: 'choices' },
-      h('button', { class: 'choice', onclick: () => { setName(nameInput.value); location.hash = '#/play'; } },
+      h('button', { class: 'choice', onclick: () => { setName(nameInput.value); navigate('#/play'); } },
         h('span', { html: ICON_PLAY }), h('b', {}, '对弈'), h('span', {}, '对战 / 教学模式，人机任意组合，支持局域网')),
-      h('button', { class: 'choice', onclick: () => { location.hash = '#/train'; } },
+      h('button', { class: 'choice', onclick: () => navigate('#/train') },
         h('span', { html: ICON_TRAIN }), h('b', {}, '训练'), h('span', {}, '自对弈训练、调参、评测与模型管理')));
   } else {
     choices = h('div', { class: 'choices' },
@@ -104,23 +125,35 @@ async function home(app) {
 }
 
 let cleanup = null;
+let routeSeq = 0;
+
 async function route() {
+  const seq = ++routeSeq;
   const app = $('#app');
-  if (cleanup) { cleanup(); cleanup = null; }
+  if (cleanup) {
+    cleanup();
+    cleanup = null;
+  }
+  const mr = $('#modal-root');
+  if (mr) mr.innerHTML = '';
   app.innerHTML = '';
+
   const r = location.hash || '#/';
   if (r.startsWith('#/play')) {
     cleanup = mountPlay(app);
   } else if (r.startsWith('#/train')) {
     const info = await loadInfo();
+    if (seq !== routeSeq) return;
     if (info.can_train === false) {
-      location.hash = '#/';
+      goHome();
       return;
     }
     const { mountTrain } = await import('./train.js');
+    if (seq !== routeSeq) return;
+    app.innerHTML = '';
     cleanup = mountTrain(app);
   } else {
-    await home(app);
+    await home(app, () => seq === routeSeq);
   }
 }
 
@@ -136,7 +169,11 @@ window.__sdhBack = () => {
   }
   const r = location.hash || '#/';
   if (r !== '#/' && r !== '#') {
-    location.hash = '#/';
+    goHome();
+    return true;
+  }
+  if (!$('.home')) {
+    goHome();
     return true;
   }
   return false;

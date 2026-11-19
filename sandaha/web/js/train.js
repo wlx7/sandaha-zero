@@ -1,6 +1,7 @@
 // Training dashboard.
 import { api, big, dur, fmt, h, modal, pct, store, toast } from './util.js';
 import { lineChart } from './chart.js';
+import { goHome } from './main.js';
 
 const COLORS = { play: '#e3b341', bid: '#4a9eff', bury: '#3fbf7f', trump: '#c77dff', rule: '#e3b341', base: '#4a9eff', prev: '#3fbf7f' };
 const ICONS = {
@@ -40,9 +41,10 @@ export function mountTrain(app) {
   }
 
   function schedule() {
+    if (!alive) return;
     clearTimeout(poll);
     const running = st.runs.some((r) => ['running', 'starting', 'evaluating'].includes(r.status && r.status.state));
-    poll = setTimeout(async () => { await refresh(); schedule(); }, running || st.installing ? 4000 : 15000);
+    poll = setTimeout(async () => { if (!alive) return; await refresh(); schedule(); }, running || st.installing ? 4000 : 15000);
   }
 
   function field(key, type = 'number', attrs = {}) {
@@ -261,7 +263,7 @@ export function mountTrain(app) {
     app.innerHTML = '';
     if (!st.form) { app.append(h('div', { class: 'page' }, h('div', { class: 'empty' }, '加载中…'))); return; }
     app.append(h('div', { class: 'page' },
-      h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => { location.hash = '#/'; } }, '← 首页'), h('h2', {}, '训练中心'),
+      h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => goHome() }, '← 首页'), h('h2', {}, '训练中心'),
         h('span', { class: 'hint' }, '算法：Deep Monte-Carlo 自对弈 (DouZero 风格) · 叫分/定主/埋底/出牌四个 Q 网络')),
       h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 380px) minmax(0, 1fr)', gap: '14px' }, class: 'train-grid' },
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '14px' } }, runsBox(), formBox()),
