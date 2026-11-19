@@ -5,12 +5,14 @@ import android.app.Activity;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.DisplayCutout;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -43,25 +45,24 @@ public class MainActivity extends Activity {
     private LinearLayout loadingOverlay;
     private long lastBackPress = 0;
     private int safeL = 0, safeT = 0, safeR = 0, safeB = 0;
+    private volatile boolean pageLoaded = false;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        getWindow().setStatusBarColor(Color.parseColor("#0a1913"));
-        getWindow().setNavigationBarColor(Color.parseColor("#0a1913"));
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            WindowManager.LayoutParams lp = getWindow().getAttributes();
-            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-            getWindow().setAttributes(lp);
+        try {
+            Window w = getWindow();
+            if (w != null) {
+                w.setStatusBarColor(Color.parseColor("#0a1913"));
+                w.setNavigationBarColor(Color.parseColor("#0a1913"));
+            }
+        } catch (Throwable ignored) {
         }
-        applyImmersiveFullscreen();
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor("#0b1f18"));
+        root.setKeepScreenOn(true);
 
         webView = new WebView(this);
         webView.setBackgroundColor(Color.parseColor("#0b1f18"));
@@ -83,6 +84,7 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
+                pageLoaded = true;
                 pushSafeInsetsToWeb();
                 if (loadingOverlay != null) {
                     loadingOverlay.setVisibility(View.GONE);
@@ -91,23 +93,36 @@ public class MainActivity extends Activity {
         });
 
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            float density = Math.max(1f, getResources().getDisplayMetrics().density);
-            int l = 0, t = 0, r = 0, b = 0;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                DisplayCutout cutout = insets.getDisplayCutout();
-                if (cutout != null) {
-                    l = Math.round(cutout.getSafeInsetLeft() / density);
-                    t = Math.round(cutout.getSafeInsetTop() / density);
-                    r = Math.round(cutout.getSafeInsetRight() / density);
-                    b = Math.round(cutout.getSafeInsetBottom() / density);
+            try {
+                if (insets == null) return insets;
+                float density = Math.max(1f, getResources().getDisplayMetrics().density);
+                int l = 0, t = 0, r = 0, b = 0;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Insets vis = insets.getInsets(
+                            WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                    l = Math.round(vis.left / density);
+                    t = Math.round(vis.top / density);
+                    r = Math.round(vis.right / density);
+                    b = Math.round(vis.bottom / density);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    DisplayCutout cutout = insets.getDisplayCutout();
+                    if (cutout != null) {
+                        l = Math.round(cutout.getSafeInsetLeft() / density);
+                        t = Math.round(cutout.getSafeInsetTop() / density);
+                        r = Math.round(cutout.getSafeInsetRight() / density);
+                        b = Math.round(cutout.getSafeInsetBottom() / density);
+                    }
                 }
-            }
-            if (l != safeL || t != safeT || r != safeR || b != safeB) {
-                safeL = l;
-                safeT = t;
-                safeR = r;
-                safeB = b;
-                pushSafeInsetsToWeb();
+                if (l != safeL || t != safeT || r != safeR || b != safeB) {
+                    safeL = l;
+                    safeT = t;
+                    safeR = r;
+                    safeB = b;
+                    if (pageLoaded) {
+                        pushSafeInsetsToWeb();
+                    }
+                }
+            } catch (Throwable ignored) {
             }
             return insets;
         });
@@ -125,11 +140,12 @@ public class MainActivity extends Activity {
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, 32, 0, 10);
 
-        TextView subtitle = new TextView(this);
+        final TextView subtitle = new TextView(this);
         subtitle.setText("正在启动本地 AI 引擎…");
         subtitle.setTextColor(Color.parseColor("#b7d2c6"));
         subtitle.setTextSize(14f);
         subtitle.setGravity(Gravity.CENTER);
+        subtitle.setPadding(36, 0, 36, 0);
 
         loadingOverlay.addView(spinner);
         loadingOverlay.addView(title);
@@ -140,6 +156,9 @@ public class MainActivity extends Activity {
         root.addView(loadingOverlay, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
+
+        // Defer window insets / cutout configuration until DecorView is attached to WindowManager
+        root.post(this::applyImmersiveFullscreen);
 
         new Thread(() -> {
             try {
@@ -153,12 +172,19 @@ public class MainActivity extends Activity {
                 PyObject mod = py.getModule("sandaha.server.lite_server");
                 int port = mod.callAttr("start_android_server", 8765, sandahaRoot.getAbsolutePath()).toInt();
                 final String url = "http://127.0.0.1:" + port + "/";
-                runOnUiThread(() -> webView.loadUrl(url));
-            } catch (final Exception e) {
-                e.printStackTrace();
                 runOnUiThread(() -> {
-                    subtitle.setText("启动失败: " + e.getMessage());
-                    Toast.makeText(MainActivity.this, "AI 引擎启动异常: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    if (!isFinishing() && !isDestroyed() && webView != null) {
+                        webView.loadUrl(url);
+                    }
+                });
+            } catch (final Throwable e) {
+                e.printStackTrace();
+                final String msg = e.getClass().getSimpleName() + ": " + e.getMessage();
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) {
+                        subtitle.setText("启动失败: " + msg);
+                        Toast.makeText(MainActivity.this, "AI 引擎启动异常: " + msg, Toast.LENGTH_LONG).show();
+                    }
                 });
             }
         }, "sandaha-boot").start();
@@ -166,35 +192,71 @@ public class MainActivity extends Activity {
 
     @SuppressWarnings("deprecation")
     private void applyImmersiveFullscreen() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(false);
-            WindowInsetsController ctrl = getWindow().getInsetsController();
-            if (ctrl != null) {
-                ctrl.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
-                ctrl.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        try {
+            if (isFinishing() || isDestroyed()) return;
+            Window w = getWindow();
+            if (w == null) return;
+            View decor = w.peekDecorView();
+            if (decor == null || !decor.isAttachedToWindow()) return;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    WindowManager.LayoutParams lp = w.getAttributes();
+                    if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS) {
+                        lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+                        w.setAttributes(lp);
+                    }
+                } catch (Throwable ignored) {
+                }
+                w.setDecorFitsSystemWindows(false);
+                WindowInsetsController ctrl = decor.getWindowInsetsController();
+                if (ctrl != null) {
+                    ctrl.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                    ctrl.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            } else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    try {
+                        WindowManager.LayoutParams lp = w.getAttributes();
+                        if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
+                            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                            w.setAttributes(lp);
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+                decor.setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                );
             }
-        } else {
-            View decor = getWindow().getDecorView();
-            decor.setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_FULLSCREEN
-            );
+        } catch (Throwable ignored) {
         }
     }
 
     private void pushSafeInsetsToWeb() {
-        if (webView == null) return;
-        final String js = String.format(Locale.US,
-                "(function(){var s=document.documentElement.style;" +
-                "s.setProperty('--safe-l','%dpx');s.setProperty('--safe-t','%dpx');" +
-                "s.setProperty('--safe-r','%dpx');s.setProperty('--safe-b','%dpx');" +
-                "window.dispatchEvent(new Event('resize'));})();",
-                safeL, safeT, safeR, safeB);
-        webView.post(() -> webView.evaluateJavascript(js, null));
+        try {
+            if (!pageLoaded || webView == null || isFinishing() || isDestroyed()) return;
+            final String js = String.format(Locale.US,
+                    "(function(){var s=document.documentElement.style;" +
+                    "s.setProperty('--safe-l','%dpx');s.setProperty('--safe-t','%dpx');" +
+                    "s.setProperty('--safe-r','%dpx');s.setProperty('--safe-b','%dpx');" +
+                    "window.dispatchEvent(new Event('resize'));})();",
+                    safeL, safeT, safeR, safeB);
+            webView.post(() -> {
+                try {
+                    if (webView != null && !isFinishing() && !isDestroyed()) {
+                        webView.evaluateJavascript(js, null);
+                    }
+                } catch (Throwable ignored) {
+                }
+            });
+        } catch (Throwable ignored) {
+        }
     }
 
     @Override
@@ -208,9 +270,11 @@ public class MainActivity extends Activity {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        applyImmersiveFullscreen();
         if (webView != null) {
-            webView.postDelayed(this::pushSafeInsetsToWeb, 120);
+            webView.postDelayed(() -> {
+                applyImmersiveFullscreen();
+                pushSafeInsetsToWeb();
+            }, 120);
         }
     }
 
@@ -279,21 +343,42 @@ public class MainActivity extends Activity {
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        if (webView != null) {
-            webView.evaluateJavascript("(window.__sdhBack ? window.__sdhBack() : false)", value -> {
-                if ("true".equals(value)) {
-                    return;
-                }
-                long now = System.currentTimeMillis();
-                if (now - lastBackPress > 2000) {
-                    lastBackPress = now;
-                    Toast.makeText(MainActivity.this, "再按一次退出三打哈 AI", Toast.LENGTH_SHORT).show();
-                } else {
-                    MainActivity.super.onBackPressed();
-                }
-            });
-            return;
+        try {
+            if (pageLoaded && webView != null) {
+                webView.evaluateJavascript("(window.__sdhBack ? window.__sdhBack() : false)", value -> {
+                    if ("true".equals(value)) {
+                        return;
+                    }
+                    long now = System.currentTimeMillis();
+                    if (now - lastBackPress > 2000) {
+                        lastBackPress = now;
+                        Toast.makeText(MainActivity.this, "再按一次退出三打哈 AI", Toast.LENGTH_SHORT).show();
+                    } else {
+                        MainActivity.super.onBackPressed();
+                    }
+                });
+                return;
+            }
+        } catch (Throwable ignored) {
         }
         super.onBackPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            pageLoaded = false;
+            if (webView != null) {
+                webView.stopLoading();
+                ViewParent parent = webView.getParent();
+                if (parent instanceof ViewGroup) {
+                    ((ViewGroup) parent).removeView(webView);
+                }
+                webView.destroy();
+                webView = null;
+            }
+        } catch (Throwable ignored) {
+        }
+        super.onDestroy();
     }
 }
