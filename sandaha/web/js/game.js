@@ -1,8 +1,8 @@
 // Lobby + game table.
-import { $, api, fmt, h, modal, pct, store, toast } from './util.js';
+import { $, api, fmt, h, modal, pct, stage, store, toast, tryLandscapeFullscreen } from './util.js';
 import { cardEl, chipEl, label, layoutHand, SUIT_SYM } from './cards.js';
 import { me, on, send } from './net.js';
-import { goHome, showRules } from './main.js';
+import { fullscreenBtn, goHome, showRules } from './main.js';
 
 const TRUMP_NAMES = ['♠ 黑桃', '♥ 红桃', '♣ 梅花', '♦ 方块', '无主', '投降'];
 const PHASE_NAMES = { bid: '叫分', trump: '定主', bury: '埋底', play: '出牌', over: '结束' };
@@ -67,9 +67,10 @@ export function mountPlay(app) {
   const onResize = () => {
     if (!alive) return;
     clearTimeout(resizeT);
-    resizeT = setTimeout(() => { if (alive) render(); }, 100);
+    resizeT = setTimeout(() => { if (alive) render(); }, 80);
   };
   window.addEventListener('resize', onResize);
+  window.addEventListener('sdh-stage-resize', onResize);
   timerInt = setInterval(tick, 250);
 
   function canManageRoomSummary(r) {
@@ -297,6 +298,7 @@ export function mountPlay(app) {
         h('label', {}, '双进单出'), rchk('shuang_jin_dan_chu', true, '庄家获胜倍数翻倍（默认开启）'),
         h('div', { class: 'full hint' }, '注：AI 模型以默认规则训练，修改规则后 AI 仍可正常出牌，但强度可能下降。')));
     const createBtn = h('button', { class: 'btn primary', onclick: () => {
+      tryLandscapeFullscreen({ autoOnlyMobile: true });
       const seats = [];
       for (let i = 0; i < 4; i++) {
         if (L.mode === 'teach') seats.push(i === 0 ? { kind: 'me' } : { kind: 'ai', model: resolveModelSpec(L.models[1]) });
@@ -322,13 +324,14 @@ export function mountPlay(app) {
           h('span', { class: 'tag' }, r.status === 'waiting' ? `等待中 · 空位 ${open}` : `第 ${r.hand_no} 局`),
           h('div', { class: 'hint' }, r.seats.map((s) => s.kind === 'open' ? '空位' : s.name).join(' · '))),
         h('div', { class: 'row', style: { flexWrap: 'nowrap', gap: '6px' } },
-          h('button', { class: joinCls, onclick: () => send({ op: 'join_room', room: r.id }) }, joinLabel),
+          h('button', { class: joinCls, onclick: () => { tryLandscapeFullscreen({ autoOnlyMobile: true }); send({ op: 'join_room', room: r.id }); } }, joinLabel),
           canManage ? h('button', { class: 'btn sm danger', onclick: () => send({ op: 'close_room', room: r.id }) }, '结束') : null)));
     }
     const closableCount = st.rooms.filter(canManageRoomSummary).length;
     app.append(h('div', { class: 'page lobby-page' },
       h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => goHome() }, '← 首页'),
         h('h2', {}, '对弈大厅'), h('span', { class: 'hint' }, `昵称：${me.name}`),
+        fullscreenBtn(() => render()),
         h('button', { class: 'btn sm ghost', onclick: showRules }, '规则')),
       h('div', { class: 'grid2 lobby-grid' },
         h('div', { class: 'card-box' }, h('h3', {}, '新建对局'), h('div', { class: 'row lobby-top-row', style: { marginBottom: '10px' } }, modeSeg, createBtn),
@@ -407,14 +410,13 @@ export function mountPlay(app) {
     const el = h('div', { class: 'stack ' + (cls || '') });
     slot.append(el);
     if (!codes || !codes.length) return el;
-    // Measure real rendered mini-card size (CSS --tcw may use clamp() which parseFloat cannot parse)
+    // Measure untransformed layout box size (offsetWidth/Height stay unswapped under CSS rotate(90deg)!)
     const probe = cardEl(codes[0], { trump, mini: true });
     probe.style.position = 'absolute';
     probe.style.visibility = 'hidden';
     el.append(probe);
-    const pr = probe.getBoundingClientRect();
-    const cw = pr.width || 40;
-    const ch = pr.height || 56;
+    const cw = probe.offsetWidth || 36;
+    const ch = probe.offsetHeight || 50;
     probe.remove();
 
     const avail = Math.max(cw * 2, slot.clientWidth - 4);
@@ -460,7 +462,7 @@ export function mountPlay(app) {
   function renderTable() {
     const v = st.view;
     const teach = v.mode === 'teach';
-    const compactScreen = (window.innerWidth || 1024) <= 900 || (window.innerHeight || 768) <= 540;
+    const compactScreen = stage.narrow || stage.compact;
     const wrap = h('div', { class: 'table-wrap' + (teach && st.reveal ? ' reveal' : '') });
 
     // ---- top bar
@@ -494,6 +496,7 @@ export function mountPlay(app) {
         },
       }, 'AI手牌'));
     }
+    tools.append(fullscreenBtn(() => render()));
     tools.append(h('button', { class: 'btn sm ghost', onclick: showRules }, '规则'));
     if (v.can_manage || v.is_host) {
       tools.append(h('button', { class: 'btn sm', onclick: showManageModal }, '管理'));
@@ -643,7 +646,7 @@ export function mountPlay(app) {
   function renderActions(box) {
     const v = st.view;
     const mine = v.my_seat !== null && v.my_seat !== undefined && v.to_act === v.my_seat;
-    const compact = (window.innerHeight || 768) <= 540 && (window.innerWidth || 1024) > (window.innerHeight || 768);
+    const compact = stage.compact;
     if (!v.phase) return;
     if (v.phase === 'over') {
       box.append(h('span', { class: 'msg' }, `${v.result.tier} · 闲家 ${v.result.xian_points} 分`),
@@ -918,5 +921,6 @@ export function mountPlay(app) {
     clearTimeout(resizeT);
     clearTimeout(resultT);
     window.removeEventListener('resize', onResize);
+    window.removeEventListener('sdh-stage-resize', onResize);
   };
 }

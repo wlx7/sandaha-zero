@@ -1,5 +1,5 @@
 // Training dashboard.
-import { api, big, dur, fmt, h, modal, pct, store, toast } from './util.js';
+import { api, big, dur, fmt, h, modal, pct, stage, store, toast } from './util.js';
 import { lineChart } from './chart.js';
 import { goHome } from './main.js';
 
@@ -268,7 +268,7 @@ export function mountTrain(app) {
       h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 380px) minmax(0, 1fr)', gap: '14px' }, class: 'train-grid' },
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '14px' } }, runsBox(), formBox()),
         detailBox())));
-    if (window.innerWidth < 900) {
+    if (stage.width < 900) {
       const g = app.querySelector('.train-grid');
       if (g) g.style.gridTemplateColumns = '1fr';
     }

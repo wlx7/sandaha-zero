@@ -1,4 +1,4 @@
-import { $, api, h, modal, store } from './util.js';
+import { $, api, canBrowserFullscreen, h, initStage, isFullscreenActive, modal, stage, store, tryLandscapeFullscreen } from './util.js';
 import { connect, me, setName } from './net.js';
 import { mountPlay } from './game.js';
 
@@ -23,6 +23,17 @@ const RULES_HTML = `
 export function showRules() {
   const m = modal(h('div', {}, h('div', { html: RULES_HTML }), h('div', { class: 'row', style: { justifyContent: 'flex-end' } },
     h('button', { class: 'btn primary', onclick: () => m.close() }, '知道了'))));
+}
+
+export function fullscreenBtn(onToggleDone) {
+  if (stage.isApk || !stage.compact || navigator.maxTouchPoints <= 0 || !canBrowserFullscreen()) return null;
+  return h('button', {
+    class: 'btn sm ghost',
+    onclick: async () => {
+      await tryLandscapeFullscreen({ toggle: true });
+      if (onToggleDone) onToggleDone();
+    },
+  }, isFullscreenActive() ? '退出全屏' : '全屏');
 }
 
 export function navigate(targetHash) {
@@ -50,12 +61,14 @@ async function loadInfo() {
   try {
     cachedInfo = await api('/api/info');
   } catch {
-    cachedInfo = { can_train: false, lan: [] };
+    cachedInfo = { can_train: false, lan: [], mobile: false };
   }
+  stage.isApk = Boolean(cachedInfo.mobile);
   return cachedInfo;
 }
 
 function enterPlayWithMode(nameVal, mode) {
+  tryLandscapeFullscreen({ autoOnlyMobile: true });
   setName(nameVal);
   const lobby = store.get('sdh.lobby', { mode: 'battle', seats: ['me', 'ai', 'ai', 'ai'], models: [null, null, null, null], ai_delay: 0.9, rules: {} });
   lobby.mode = mode;
@@ -68,14 +81,14 @@ async function home(app, isAlive) {
   if (!isAlive()) return;
   app.innerHTML = '';
   const canTrain = info.can_train !== false;
-  const nameInput = h('input', { value: me.name, maxlength: 16, 'aria-label': '昵称', style: { width: '148px' } });
+  const nameInput = h('input', { value: me.name, maxlength: 16, 'aria-label': '昵称', style: { width: '136px' } });
   nameInput.addEventListener('change', () => setName(nameInput.value));
   const lan = h('div', { class: 'lan' });
 
   let choices;
   if (canTrain) {
     choices = h('div', { class: 'choices' },
-      h('button', { class: 'choice', onclick: () => { setName(nameInput.value); navigate('#/play'); } },
+      h('button', { class: 'choice', onclick: () => { tryLandscapeFullscreen({ autoOnlyMobile: true }); setName(nameInput.value); navigate('#/play'); } },
         h('span', { html: ICON_PLAY }), h('b', {}, '对弈'), h('span', {}, '对战 / 教学模式，人机任意组合，支持局域网')),
       h('button', { class: 'choice', onclick: () => navigate('#/train') },
         h('span', { html: ICON_TRAIN }), h('b', {}, '训练'), h('span', {}, '自对弈训练、调参、评测与模型管理')));
@@ -93,7 +106,8 @@ async function home(app, isAlive) {
       h('h1', {}, '三打哈 AI'),
       h('div', { class: 'sub' }, '湖南三打哈 · 强化学习 AI · 局域网联机 · 教学点评')),
     h('div', { class: 'namebox' }, h('label', { class: 'hint' }, '昵称'), nameInput,
-      h('button', { class: 'btn sm ghost', onclick: showRules }, '规则说明')));
+      h('button', { class: 'btn sm ghost', onclick: showRules }, '规则说明'),
+      fullscreenBtn(() => { if (isAlive()) home(app, isAlive); })));
 
   const mainBox = h('div', { class: 'home-main' }, choices, lan);
 
@@ -106,10 +120,10 @@ async function home(app, isAlive) {
     const showQrModal = () => {
       const m = modal(h('div', { style: { textAlign: 'center' } },
         h('h2', {}, '局域网扫码联机'),
-        h('img', { src: `/api/qr?url=${encodeURIComponent(url)}`, alt: '局域网二维码', style: { width: '180px', height: '180px', background: '#fff', borderRadius: '10px', padding: '6px' } }),
-        h('div', { style: { marginTop: '8px' } }, ...info.lan.map((u) => h('div', {}, h('b', {}, u)))),
-        h('div', { class: 'hint', style: { marginTop: '6px' } }, '同一 Wi-Fi 下的手机或电脑扫码即可加入房间'),
-        h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '12px' } },
+        h('img', { src: `/api/qr?url=${encodeURIComponent(url)}`, alt: '局域网二维码', style: { width: '164px', height: '164px', background: '#fff', borderRadius: '10px', padding: '6px' } }),
+        h('div', { style: { marginTop: '6px' } }, ...info.lan.map((u) => h('div', {}, h('b', {}, u)))),
+        h('div', { class: 'hint', style: { marginTop: '4px' } }, '同一 Wi-Fi 下的手机或电脑扫码即可横屏畅玩'),
+        h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '10px' } },
           h('button', { class: 'btn primary', onclick: () => m.close() }, '关闭'))));
     };
     const shownLan = info.lan.slice(0, 2);
@@ -153,6 +167,9 @@ async function route() {
     app.innerHTML = '';
     cleanup = mountTrain(app);
   } else {
+    const onStageResize = () => { if (seq === routeSeq) home(app, () => seq === routeSeq); };
+    window.addEventListener('sdh-stage-resize', onStageResize);
+    cleanup = () => window.removeEventListener('sdh-stage-resize', onStageResize);
     await home(app, () => seq === routeSeq);
   }
 }
@@ -179,6 +196,7 @@ window.__sdhBack = () => {
   return false;
 };
 
+initStage();
 window.addEventListener('hashchange', route);
 connect();
 route();

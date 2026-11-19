@@ -20,7 +20,7 @@
 前往 [**GitHub Releases**](https://github.com/wlx7/sandaha-zero/releases/latest) 下载对应平台文件：
 
 - **Windows 电脑**：下载 `SanDaHa-Zero-Windows-x64.exe`，双击即可启动本地服务并打开浏览器（纯粹对弈/教学精简版，剥离训练依赖，内置 `sandaha-best` 与 `sandaha-lite` 双 v2.2 模型，无需安装 Python）。
-- **Android 手机 / 平板**：下载 `SanDaHa-Zero-Android.apk` 安装即可离线畅玩对战模式与教学点评（支持沉浸式全屏、横竖屏一屏自适应与 Android 15/16 / ColorOS 16 的 16KB 内存页架构，内置 Python 3.13 + NumPy 推理引擎；同一 Wi-Fi 下其他手机也可扫码加入房间）。
+- **Android 手机 / 平板**：下载 `SanDaHa-Zero-Android.apk` 安装即可离线畅玩对战模式与教学点评（原生全屏横屏体验，支持 Android 15/16 / ColorOS 16 的 16KB 内存页架构，内置 Python 3.13 + NumPy 推理引擎；同一 Wi-Fi 下其他手机扫码打开浏览器也会自动切换横屏画布）。
 
 ### 方式二：从源码运行
 

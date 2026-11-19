@@ -29,26 +29,73 @@
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
+  --stage-w: 100vw;
+  --stage-h: 100dvh;
+  --stage-left: 0px;
+  --stage-top: 0px;
+  --vw1: 1vw;
+  --vh1: 1dvh;
   font-size: 15px;
 }
-@media (max-width: 760px) {
-  :root { --cw: 52px; --ch: 74px; --cfont: 15px; --tcw: 40px; --tch: 56px; --tfont: 13px; font-size: 14px; }
-}
-@media (max-height: 760px) and (min-width: 761px) {
+
+@media (max-height: 760px) and (min-height: 541px) {
   :root { --cw: 62px; --ch: 86px; --cfont: 17px; --tcw: 44px; --tch: 62px; --tfont: 14px; }
 }
-@media (max-height: 620px) and (min-width: 761px) {
+@media (max-height: 620px) and (min-height: 541px) {
   :root { --cw: 56px; --ch: 78px; --cfont: 16px; }
   .avatar { width: 38px; height: 38px; font-size: 1rem; }
 }
-@media (max-width: 390px) {
-  :root { --cw: 48px; --ch: 68px; --cfont: 14px; --tcw: 36px; --tch: 50px; --tfont: 12px; }
-}
+
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif; }
-body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-#app { height: 100%; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+}
+body {
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--bg);
+}
+#app { min-height: 100%; height: 100%; }
+
+/* Forced 90deg clockwise landscape stage for portrait mobile browsers */
+html.rotated-landscape {
+  --safe-l: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-left, 0px);
+}
+html.rotated-landscape,
+html.rotated-landscape body {
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  overscroll-behavior: none;
+}
+html.rotated-landscape #stage {
+  position: fixed;
+  top: var(--stage-top);
+  left: calc(var(--stage-left) + var(--stage-h));
+  width: var(--stage-w);
+  height: var(--stage-h);
+  transform-origin: 0 0;
+  transform: rotate(90deg);
+  overscroll-behavior: contain;
+}
+
 button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
 input, select { font: inherit; color: var(--text); background: var(--bg2); border: 1px solid var(--line);
   border-radius: 8px; padding: 7px 9px; min-width: 0; }
@@ -70,14 +117,14 @@ h1, h2, h3 { margin: 0; font-weight: 700; }
 .btn.on { outline: 2px solid var(--gold); }
 
 .toast { position: fixed; left: 50%; top: calc(12px + var(--safe-t)); transform: translate(-50%, -350%); background: #2b1d0a; border: 1px solid var(--gold);
-  color: var(--gold2); padding: 8px 16px; border-radius: 10px; z-index: 1000; transition: transform .25s; max-width: 90vw; box-shadow: var(--shadow); }
+  color: var(--gold2); padding: 8px 16px; border-radius: 10px; z-index: 1000; transition: transform .25s; max-width: calc(var(--stage-w) * .9); box-shadow: var(--shadow); }
 .toast.show { transform: translate(-50%, 0); }
 
 /* ----------------------------------------------------------- home --- */
 .home { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: safe center;
   padding: calc(22px + var(--safe-t)) calc(16px + var(--safe-r)) calc(18px + var(--safe-b)) calc(16px + var(--safe-l));
   background: radial-gradient(ellipse at top, #1d5a45 0%, var(--bg) 70%); }
-.home-inner { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 640px; }
+.home-inner { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 680px; }
 .home-brand { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .home-main { display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 20px; }
 .home .logo { width: 84px; height: 84px; }
@@ -95,11 +142,6 @@ h1, h2, h3 { margin: 0; font-weight: 700; }
 .home .lan .lan-qr { width: 90px; height: 90px; border-radius: 8px; background: #fff; cursor: pointer; }
 .home .lan .lan-qr-btn { display: none; }
 .home .foot { margin-top: 18px; color: var(--muted); font-size: .78rem; text-align: center; }
-@media (max-width: 480px) {
-  .home .choices { grid-template-columns: 1fr 1fr; gap: 10px; }
-  .choice { padding: 16px 8px; }
-  .choice svg { width: 46px; height: 46px; }
-}
 
 /* ----------------------------------------------------- page chrome --- */
 .page { max-width: 1240px; margin: 0 auto;
@@ -110,7 +152,6 @@ h1, h2, h3 { margin: 0; font-weight: 700; }
 .card-box h3 { font-size: 1.05rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
 .card-box h3 svg { width: 22px; height: 22px; flex: none; }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
-@media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
 .form { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px 10px; align-items: center; }
 .form label { color: var(--muted); font-size: .9rem; }
 .form .full { grid-column: 1 / -1; }
@@ -122,7 +163,7 @@ h1, h2, h3 { margin: 0; font-weight: 700; }
 details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .room-item { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); flex-wrap: wrap; }
-.room-item .meta { margin-right: auto; }
+.room-item .meta { margin-right: auto; min-width: 0; }
 .tag { display: inline-block; font-size: .76rem; padding: 1px 7px; border-radius: 99px; background: #24493d; color: var(--muted); white-space: nowrap; }
 .tag.gold { background: #4a3b10; color: var(--gold2); }
 .tag.green { background: #164d33; color: #8ff0bf; }
@@ -165,7 +206,7 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 .stack .card.mini + .card.mini { margin-left: calc(var(--tcw) * -0.5); }
 
 /* ---------------------------------------------------------- table --- */
-.table-wrap { height: 100vh; height: 100dvh; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
+.table-wrap { width: 100%; height: var(--stage-h); display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
 .topbar { display: flex; align-items: center; gap: 8px;
   padding: calc(5px + var(--safe-t)) calc(10px + var(--safe-r)) 5px calc(10px + var(--safe-l));
   background: #0a1913; border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 42px; flex: none; z-index: 10; }
@@ -177,7 +218,7 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 
 .main-area { flex: 1; display: flex; min-height: 0; position: relative; }
 .felt { flex: 1; min-width: 0; min-height: 0; display: grid;
-  grid-template-columns: clamp(78px, 16vw, 165px) minmax(0, 1fr) clamp(78px, 16vw, 165px);
+  grid-template-columns: clamp(78px, calc(var(--vw1) * 16), 165px) minmax(0, 1fr) clamp(78px, calc(var(--vw1) * 16), 165px);
   grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas: "tl top tr" "left center right" "hand hand hand";
   background: radial-gradient(ellipse at center, var(--felt1) 0%, var(--felt2) 75%);
@@ -203,11 +244,10 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 .timer.warn > i { background: var(--red); }
 .mini-hand { display: none; max-width: 100%; }
 .reveal .mini-hand { display: flex; }
-@media (max-width: 900px) { .reveal .mini-hand { display: none; } }
 
 /* Overlap-proof 3x3 center trick arena: ptop, mid, and pme occupy strictly separate rows */
 .center { grid-area: center; display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(130px, 1.4fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(130px, 1.35fr) minmax(0, 1fr);
   grid-template-rows: minmax(var(--tch), 1fr) auto minmax(var(--tch), 1fr);
   grid-template-areas:
     "pleft ptop pright"
@@ -221,9 +261,9 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 .pslot.p-me { grid-area: pme; align-self: start; }
 .mid { grid-area: mid; justify-self: center; display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; text-align: center; color: #dceee6; font-size: .84rem; padding: 4px 12px; border-radius: 12px;
-  background: rgba(6, 22, 16, .38); border: 1px solid rgba(227, 179, 65, .2); max-width: 100%; }
-.mid .big { font-size: 1.08rem; font-weight: 800; color: var(--gold2); white-space: nowrap; }
-.mid .mid-sub { white-space: nowrap; }
+  background: rgba(6, 22, 16, .38); border: 1px solid rgba(227, 179, 65, .2); max-width: 100%; min-width: 0; overflow: hidden; }
+.mid .big { font-size: 1.08rem; font-weight: 800; color: var(--gold2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mid .mid-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .pslot .stack.win .card.mini { box-shadow: 0 0 0 2px var(--gold), 0 2px 6px rgba(0,0,0,.4); }
 .fly-top { animation: flyTop .3s ease-out; }
 .fly-left { animation: flyLeft .3s ease-out; }
@@ -260,10 +300,30 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 .side .tabs button.on { border-bottom-color: var(--gold); color: var(--gold2); font-weight: 700; }
 .side .body { flex: 1; overflow: auto; padding: 10px; }
 .side .closebtn { flex: none; border: 0; background: transparent; padding: 0 14px; font-size: 1.3rem; }
-@media (max-width: 1000px) {
-  .side-backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 55; }
-  .side { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 64dvh; border-left: 0; border-top: 2px solid var(--gold);
-    border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.55); padding-bottom: var(--safe-b); }
+
+html.narrow-stage .reveal .mini-hand { display: none; }
+html.narrow-stage .side-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 55;
+}
+html.narrow-stage .side {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: min(380px, calc(var(--vw1) * 56));
+  height: var(--stage-h);
+  border-top: 0;
+  border-left: 2px solid var(--gold);
+  border-radius: 14px 0 0 14px;
+  box-shadow: -10px 0 30px rgba(0,0,0,.55);
+  padding-top: var(--safe-t);
+  padding-right: var(--safe-r);
+  padding-bottom: var(--safe-b);
 }
 
 .counter-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
@@ -291,7 +351,7 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.58); display: grid; place-items: center; z-index: 200;
   padding: calc(10px + var(--safe-t)) calc(14px + var(--safe-r)) calc(10px + var(--safe-b)) calc(14px + var(--safe-l)); }
-.modal { background: var(--panel); border: 1px solid var(--gold); border-radius: 16px; padding: 16px; width: min(560px, 100%); max-height: 92dvh; overflow: auto; box-shadow: var(--shadow); }
+.modal { background: var(--panel); border: 1px solid var(--gold); border-radius: 16px; padding: 16px; width: min(560px, 100%); max-height: calc(var(--stage-h) * .92); overflow: auto; box-shadow: var(--shadow); }
 .modal h2 { color: var(--gold2); margin-bottom: 8px; font-size: 1.2rem; }
 .result-big { font-size: 1.8rem; font-weight: 900; text-align: center; margin: 4px 0; }
 .result-big.win { color: #8ff0bf; } .result-big.lose { color: #ff9b9b; }
@@ -322,156 +382,144 @@ table.evals th, table.evals td { padding: 5px 6px; border-bottom: 1px solid #234
 table.evals th:first-child, table.evals td:first-child { text-align: left; }
 .empty { color: var(--muted); text-align: center; padding: 24px 10px; }
 
-/* Portrait mobile adjustments */
-@media (max-width: 760px) and (orientation: portrait) {
-  .topbar { padding: calc(4px + var(--safe-t)) 6px 4px; gap: 4px; }
-  .topbar .pill { font-size: .78rem; padding: 2px 7px; }
-  .btn.sm { min-height: 27px; padding: 2px 8px; font-size: .82rem; }
-  .felt { padding: 4px; gap: 4px; grid-template-columns: 74px minmax(0, 1fr) 74px; }
-  .buried-inline { display: none; }
-}
-
 /* ==========================================================================
-   Android / Mobile Landscape Mode (height <= 540px, width > height):
+   Compact Landscape Mode (stage height <= 540px: both native phone landscape
+   AND CSS 90deg-rotated portrait mobile browsers!):
    100% single-viewport fit (zero vertical scrolling!) + zero element overlap
    ========================================================================== */
-@media (max-height: 540px) and (orientation: landscape) {
-  :root {
-    --cw: clamp(44px, 5.5vw, 52px);
-    --ch: clamp(58px, 16.2dvh, 70px);
-    --cfont: 14px;
-    --tcw: clamp(30px, 3.8vw, 36px);
-    --tch: clamp(42px, 11.4dvh, 50px);
-    --tfont: 11.5px;
-    font-size: 13.5px;
-  }
-
-  /* Home screen: sleek 2-column horizontal layout so no scrolling needed */
-  .home { padding: calc(10px + var(--safe-t)) calc(18px + var(--safe-r)) calc(8px + var(--safe-b)) calc(18px + var(--safe-l)); }
-  .home-inner { flex-direction: row; justify-content: center; align-items: center; gap: 24px; max-width: 860px; }
-  .home-brand { flex: 0 1 280px; }
-  .home-main { flex: 1 1 360px; margin-top: 0; }
-  .home .logo { width: 54px; height: 54px; }
-  .home h1 { font-size: 1.65rem; margin-top: 4px; }
-  .home .sub { font-size: .82rem; margin-top: 3px; }
-  .home .namebox { margin-top: 10px; }
-  .home .choices { grid-template-columns: repeat(2, minmax(0, 195px)); gap: 12px; }
-  .choice { padding: 14px 10px; gap: 6px; border-radius: 14px; }
-  .choice svg { width: 42px; height: 42px; }
-  .choice b { font-size: 1.1rem; }
-  .choice span { font-size: .78rem; }
-  .home .lan { margin-top: 10px; gap: 8px; }
-  .home .lan .lan-qr { display: none; }
-  .home .lan .lan-qr-btn { display: inline-flex; margin-top: 4px; }
-  .home .lan .lan-text { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .home .foot { margin-top: 8px; font-size: .72rem; }
-
-  /* Lobby compact */
-  .page { padding: calc(5px + var(--safe-t)) calc(12px + var(--safe-r)) calc(10px + var(--safe-b)) calc(12px + var(--safe-l)); }
-  .pagebar { margin-bottom: 5px; gap: 8px; }
-  .pagebar h2 { font-size: 1.05rem; }
-  .card-box { padding: 8px 10px; }
-  .card-box h3 { font-size: .95rem; margin-bottom: 6px; }
-  .lobby-grid { grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr); gap: 8px; }
-  .lobby-top-row { margin-bottom: 6px !important; }
-  .seg button { padding: 4px 10px; font-size: .84rem; }
-  .seat-cfg { gap: 4px; margin-bottom: 4px; grid-template-columns: 48px minmax(0, 116px) minmax(0, 1fr); }
-  .seat-cfg.human-seat { grid-template-columns: 48px minmax(0, 148px); }
-  .seat-cfg select { padding: 3px 6px; font-size: .82rem; }
-  .lobby-page .hint { font-size: .76rem; line-height: 1.28; }
-  .lobby-delay-row { margin-top: 5px !important; }
-  .room-item { padding: 7px 9px; gap: 6px; }
-  .manage-grid { gap: 6px; }
-
-  /* Topbar: strictly 1 row, horizontally scrollable if cramped */
-  .topbar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    min-height: 30px;
-    padding: max(2px, var(--safe-t)) max(8px, var(--safe-r)) 2px max(8px, var(--safe-l));
-    gap: 6px;
-  }
-  .topbar .info { flex-wrap: nowrap; gap: 4px; }
-  .topbar .tools { flex-wrap: nowrap; gap: 4px; }
-  .topbar .pill { font-size: .76rem; padding: 1px 7px; }
-  .btn.sm { min-height: 24px; padding: 1px 7px; font-size: .78rem; border-radius: 7px; }
-
-  /* Table felt: locked to viewport, zero vertical scrolling! */
-  .felt {
-    overflow: hidden;
-    padding: 2px max(8px, var(--safe-r)) max(2px, var(--safe-b)) max(8px, var(--safe-l));
-    gap: 2px 6px;
-    grid-template-columns: clamp(72px, 13.5vw, 128px) minmax(0, 1fr) clamp(72px, 13.5vw, 128px);
-  }
-  .reveal .mini-hand { display: none; }
-
-  /* Compact opponent seats */
-  .seat { padding: 1px 3px; gap: 2px; }
-  .seat.top { flex-direction: row; flex-wrap: nowrap; justify-content: center; gap: 6px; }
-  .avatar { width: 26px; height: 26px; font-size: .78rem; border-width: 1.5px; }
-  .avatar .badge { font-size: .6rem; bottom: -4px; right: -6px; padding: 0 3px; }
-  .seat .name { font-size: .78rem; max-width: 110px; }
-  .seat .sub { font-size: .72rem; gap: 4px; }
-  .bubble { font-size: .74rem; padding: 0 6px; }
-
-  /* Center trick arena: compact inline pill for mid, zero overlap */
-  .center { gap: 2px 6px; }
-  .mid { flex-direction: row; gap: 7px; padding: 2px 10px; border-radius: 99px; font-size: .76rem; }
-  .mid .big { font-size: .88rem; }
-
-  /* Single-line unified control bar above single-row hand */
-  .hand-area { gap: 2px; }
-  .control-bar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    justify-content: flex-start;
-    gap: 7px;
-    min-height: 28px;
-    padding: 0 2px;
-  }
-  .control-bar > :first-child { margin-left: auto; }
-  .control-bar > :last-child { margin-right: auto; }
-  .me-status { gap: 5px; }
-  .me-av { width: 24px; height: 24px; font-size: .75rem; }
-  .me-name { font-size: .8rem; max-width: 72px; }
-  .me-score { font-size: .78rem; }
-  .me-timer { width: 48px; }
-  .buried-inline { display: none; }
-
-  .actions { flex-wrap: nowrap; min-height: 26px; gap: 5px; }
-  .actions .msg { font-size: .8rem; }
-  .actions .btn { min-height: 26px; padding: 2px 9px; font-size: .8rem; border-radius: 8px; }
-  .bid-grid { flex-wrap: nowrap; gap: 3px; max-width: none; }
-  .bid-grid .btn { min-width: 32px; padding: 2px 5px; min-height: 25px; font-size: .78rem; }
-  .chip { min-width: 24px; height: 20px; font-size: 11px; padding: 0 3px; }
-  .chips { flex-wrap: nowrap; gap: 2px; }
-
-  .card.sel { transform: translateY(-9px); }
-  .card .idx .tmark { font-size: 8px; margin-top: 1px; }
-
-  /* Right-side slide-over drawer instead of bottom sheet in landscape */
-  .side {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: auto;
-    width: min(380px, 56vw);
-    height: 100dvh;
-    border-top: 0;
-    border-left: 2px solid var(--gold);
-    border-radius: 14px 0 0 14px;
-    padding-top: var(--safe-t);
-    padding-right: var(--safe-r);
-    padding-bottom: var(--safe-b);
-  }
-  .side .tabs button { padding: 7px 4px; font-size: .85rem; }
-  .side .body { padding: 8px; }
-
-  /* Compact settlement & rule modals in landscape */
-  .modal { padding: 12px 14px; max-height: 94dvh; }
-  .modal h2 { font-size: 1.05rem; margin-bottom: 4px; }
-  .result-big { font-size: 1.35rem; margin: 2px 0; }
-  .score-grid { margin: 6px 0; gap: 5px; }
-  .score-grid div { padding: 4px; font-size: .78rem; }
-  .score-grid b { font-size: 1rem; }
+html.compact-landscape {
+  --cw: clamp(44px, calc(var(--vw1) * 5.5), 52px);
+  --ch: clamp(58px, calc(var(--vh1) * 16.2), 70px);
+  --cfont: 14px;
+  --tcw: clamp(30px, calc(var(--vw1) * 3.8), 36px);
+  --tch: clamp(42px, calc(var(--vh1) * 11.4), 50px);
+  --tfont: 11.5px;
+  font-size: 13.5px;
 }
+
+/* Home screen: sleek 2-column horizontal layout so no scrolling needed */
+html.compact-landscape .home {
+  padding: calc(8px + var(--safe-t)) calc(14px + var(--safe-r)) calc(6px + var(--safe-b)) calc(14px + var(--safe-l));
+}
+html.compact-landscape .home-inner {
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  max-width: 860px;
+}
+html.compact-landscape .home-brand { flex: 0 1 250px; }
+html.compact-landscape .home-main { flex: 1 1 340px; margin-top: 0; }
+html.compact-landscape .home .logo { width: 52px; height: 52px; }
+html.compact-landscape .home h1 { font-size: 1.6rem; margin-top: 4px; }
+html.compact-landscape .home .sub { font-size: .8rem; margin-top: 3px; }
+html.compact-landscape .home .namebox { margin-top: 10px; gap: 6px; }
+html.compact-landscape .home .choices { grid-template-columns: repeat(2, minmax(0, 190px)); gap: 10px; }
+html.compact-landscape .choice { padding: 12px 10px; gap: 5px; border-radius: 14px; }
+html.compact-landscape .choice svg { width: 40px; height: 40px; }
+html.compact-landscape .choice b { font-size: 1.08rem; }
+html.compact-landscape .choice span { font-size: .76rem; }
+html.compact-landscape .home .lan { margin-top: 8px; gap: 8px; }
+html.compact-landscape .home .lan .lan-qr { display: none; }
+html.compact-landscape .home .lan .lan-qr-btn { display: inline-flex; margin-top: 2px; }
+html.compact-landscape .home .lan .lan-text { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+html.compact-landscape .home .foot { margin-top: 6px; font-size: .72rem; }
+
+/* Lobby compact */
+html.compact-landscape .page {
+  padding: calc(5px + var(--safe-t)) calc(10px + var(--safe-r)) calc(10px + var(--safe-b)) calc(10px + var(--safe-l));
+}
+html.compact-landscape .pagebar { margin-bottom: 5px; gap: 8px; }
+html.compact-landscape .pagebar h2 { font-size: 1.05rem; }
+html.compact-landscape .card-box { padding: 8px 10px; }
+html.compact-landscape .card-box h3 { font-size: .95rem; margin-bottom: 6px; }
+html.compact-landscape .lobby-grid { grid-template-columns: minmax(0, 1.14fr) minmax(0, 0.86fr); gap: 8px; }
+html.compact-landscape .lobby-top-row { margin-bottom: 6px !important; }
+html.compact-landscape .seg button { padding: 4px 10px; font-size: .84rem; }
+html.compact-landscape .seat-cfg { gap: 4px; margin-bottom: 4px; grid-template-columns: 46px minmax(0, 110px) minmax(0, 1fr); }
+html.compact-landscape .seat-cfg.human-seat { grid-template-columns: 46px minmax(0, 144px); }
+html.compact-landscape .seat-cfg select { padding: 3px 6px; font-size: .82rem; }
+html.compact-landscape .lobby-page .hint { font-size: .75rem; line-height: 1.28; }
+html.compact-landscape .lobby-delay-row { margin-top: 5px !important; }
+html.compact-landscape .room-item { padding: 7px 9px; gap: 6px; }
+html.compact-landscape .manage-grid { gap: 6px; }
+
+/* Topbar: strictly 1 row, horizontally scrollable if cramped */
+html.compact-landscape .topbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-height: 30px;
+  padding: max(2px, var(--safe-t)) max(8px, var(--safe-r)) 2px max(8px, var(--safe-l));
+  gap: 6px;
+}
+html.compact-landscape .topbar .info { flex-wrap: nowrap; gap: 4px; }
+html.compact-landscape .topbar .tools { flex-wrap: nowrap; gap: 4px; }
+html.compact-landscape .topbar .pill { font-size: .76rem; padding: 1px 7px; }
+html.compact-landscape .btn.sm { min-height: 24px; padding: 1px 7px; font-size: .78rem; border-radius: 7px; }
+
+/* Table felt: locked to stage viewport, zero vertical scrolling! */
+html.compact-landscape .felt {
+  overflow: hidden;
+  padding: 2px max(8px, var(--safe-r)) max(2px, var(--safe-b)) max(8px, var(--safe-l));
+  gap: 2px 6px;
+  grid-template-columns: clamp(68px, calc(var(--vw1) * 13.2), 126px) minmax(0, 1fr) clamp(68px, calc(var(--vw1) * 13.2), 126px);
+}
+html.compact-landscape .reveal .mini-hand { display: none; }
+
+/* Compact opponent seats */
+html.compact-landscape .seat { padding: 1px 3px; gap: 2px; }
+html.compact-landscape .seat.top { flex-direction: row; flex-wrap: nowrap; justify-content: center; gap: 6px; }
+html.compact-landscape .avatar { width: 26px; height: 26px; font-size: .78rem; border-width: 1.5px; }
+html.compact-landscape .avatar .badge { font-size: .6rem; bottom: -4px; right: -6px; padding: 0 3px; }
+html.compact-landscape .seat .name { font-size: .78rem; max-width: 110px; }
+html.compact-landscape .seat .sub { font-size: .72rem; gap: 4px; }
+html.compact-landscape .bubble { font-size: .74rem; padding: 0 6px; }
+
+/* Center trick arena: compact inline pill for mid, zero overlap */
+html.compact-landscape .center {
+  gap: 2px 6px;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 1.35fr) minmax(0, 1fr);
+}
+html.compact-landscape .mid { flex-direction: row; gap: 6px; padding: 2px 9px; border-radius: 99px; font-size: .75rem; }
+html.compact-landscape .mid .big { font-size: .86rem; }
+
+/* Single-line unified control bar above single-row hand */
+html.compact-landscape .hand-area { gap: 2px; }
+html.compact-landscape .control-bar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  justify-content: flex-start;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 2px;
+}
+html.compact-landscape .control-bar > :first-child { margin-left: auto; }
+html.compact-landscape .control-bar > :last-child { margin-right: auto; }
+html.compact-landscape .me-status { gap: 5px; }
+html.compact-landscape .me-av { width: 24px; height: 24px; font-size: .75rem; }
+html.compact-landscape .me-name { font-size: .8rem; max-width: 72px; }
+html.compact-landscape .me-score { font-size: .78rem; }
+html.compact-landscape .me-timer { width: 48px; }
+html.compact-landscape .buried-inline { display: none; }
+
+html.compact-landscape .actions { flex-wrap: nowrap; min-height: 26px; gap: 5px; }
+html.compact-landscape .actions .msg { font-size: .8rem; }
+html.compact-landscape .actions .btn { min-height: 26px; padding: 2px 9px; font-size: .8rem; border-radius: 8px; }
+html.compact-landscape .bid-grid { flex-wrap: nowrap; gap: 3px; max-width: none; }
+html.compact-landscape .bid-grid .btn { min-width: 32px; padding: 2px 5px; min-height: 25px; font-size: .78rem; }
+html.compact-landscape .chip { min-width: 24px; height: 20px; font-size: 11px; padding: 0 3px; }
+html.compact-landscape .chips { flex-wrap: nowrap; gap: 2px; }
+
+html.compact-landscape .card.sel { transform: translateY(-9px); }
+html.compact-landscape .card .idx .tmark { font-size: 8px; margin-top: 1px; }
+
+html.compact-landscape .side .tabs button { padding: 7px 4px; font-size: .85rem; }
+html.compact-landscape .side .body { padding: 8px; }
+
+/* Compact settlement & rule modals in landscape */
+html.compact-landscape .modal { padding: 12px 14px; max-height: calc(var(--stage-h) * .94); }
+html.compact-landscape .modal h2 { font-size: 1.05rem; margin-bottom: 4px; }
+html.compact-landscape .result-big { font-size: 1.35rem; margin: 2px 0; }
+html.compact-landscape .score-grid { margin: 6px 0; gap: 5px; }
+html.compact-landscape .score-grid div { padding: 4px; font-size: .78rem; }
+html.compact-landscape .score-grid b { font-size: 1rem; }

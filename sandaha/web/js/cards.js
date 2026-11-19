@@ -1,5 +1,5 @@
 // Card rendering and hand layout.
-import { h } from './util.js';
+import { h, stage } from './util.js';
 
 export const SUIT_SYM = { S: '♠', H: '♥', C: '♣', D: '♦' };
 export const SUIT_IDX = { S: 0, H: 1, C: 2, D: 3 };
@@ -72,27 +72,30 @@ function groupOf(code, trump) {
 
 /**
  * Lay out a hand into rows inside `container` (absolute positioning).
- * In landscape mobile viewports, keeps up to 29 cards in a single row so the
- * table fits 100% inside 100dvh with zero vertical scrolling or clipping.
+ * Uses untransformed layout metrics (`offsetWidth`/`offsetHeight` and `stage.compact`)
+ * so both native landscape and CSS 90°-rotated mobile browsers render identically
+ * with up to 29 cards in a single clean horizontal row.
  */
 export function layoutHand(container, codes, { trump = null, selected = new Set(), onToggle = null, disabled = false } = {}) {
   container.innerHTML = '';
   const n = codes.length;
   if (!n) { container.style.height = '0px'; return; }
 
-  const style = getComputedStyle(document.documentElement);
-  const cw = parseFloat(style.getPropertyValue('--cw')) || 70;
-  const ch = parseFloat(style.getPropertyValue('--ch')) || 98;
-  const W = Math.max(cw * 3, container.clientWidth || container.parentElement.clientWidth || 360);
+  // Measure real untransformed card size (handles clamp() and CSS 90deg rotation cleanly)
+  const probe = cardEl(codes[0], { trump });
+  probe.style.visibility = 'hidden';
+  container.append(probe);
+  const cw = probe.offsetWidth || 50;
+  const ch = probe.offsetHeight || 70;
+  probe.remove();
 
-  const vw = window.innerWidth || W;
-  const vh = window.innerHeight || 700;
-  const shortLandscape = vw > vh && vh <= 540;
+  const W = Math.max(cw * 3, container.clientWidth || (container.parentElement && container.parentElement.clientWidth) || stage.width - 24);
+  const shortLandscape = stage.compact;
 
-  const groupGap = shortLandscape ? Math.max(4, Math.round(cw * 0.10)) : Math.round(cw * 0.18);
+  const groupGap = shortLandscape ? Math.max(3, Math.round(cw * 0.09)) : Math.round(cw * 0.18);
   const minStep = shortLandscape ? Math.max(17, Math.round(cw * 0.37)) : Math.max(23, Math.round(cw * 0.48));
   const maxStep = Math.round(cw * 0.66);
-  const maxRows = shortLandscape ? 1 : 4;
+  const maxRows = shortLandscape ? 1 : 3;
 
   let rows = 1;
   const groups = codes.map((c) => groupOf(c, trump));
@@ -105,7 +108,7 @@ export function layoutHand(container, codes, { trump = null, selected = new Set(
     if (step >= minStep || rows >= maxRows) break;
     rows++;
   }
-  const absFloor = shortLandscape ? 15 : 19;
+  const absFloor = shortLandscape ? 16 : 19;
   step = Math.min(maxStep, Math.max(absFloor, step));
   const per = Math.ceil(n / rows);
   const rowGap = rows > 1 ? Math.round(ch * (rows > 2 ? 0.56 : 0.66)) : 0;
