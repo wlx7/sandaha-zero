@@ -187,11 +187,17 @@ export function mountPlay(app) {
 
   // ======================================================== lobby =====
   function modelOptions(selected) {
-    const opts = [h('option', { value: 'rule' }, '规则AI (基准)'), h('option', { value: 'random' }, '随机AI')];
+    const fmtLabel = (m) => {
+      if (m.label === 'sandaha-best') return 'sandaha-best（最强主力）';
+      if (m.label === 'sandaha-lite') return 'sandaha-lite（轻量快速）';
+      return m.label;
+    };
+    const opts = [];
     for (const m of st.models.filter((x) => x.kind !== 'checkpoint')) {
-      opts.push(h('option', { value: m.path }, m.label));
+      opts.push(h('option', { value: m.path }, fmtLabel(m)));
       opts.push(h('option', { value: m.path + '?search' }, `${m.label} + 搜索增强`));
     }
+    opts.push(h('option', { value: 'rule' }, '规则AI (基准)'), h('option', { value: 'random' }, '随机AI'));
     const ck = st.models.filter((x) => x.kind === 'checkpoint').slice(-12);
     if (ck.length) opts.push(h('optgroup', { label: '训练检查点' }, ck.map((m) => h('option', { value: m.path }, m.label))));
     const sel = h('select', {}, opts);
@@ -215,14 +221,17 @@ export function mountPlay(app) {
           h('option', { value: 'human' }, '等待玩家加入'),
           h('option', { value: 'ai' }, 'AI'));
         kind.value = L.seats[i];
-        const msel = modelOptions(L.models[i]);
-        msel.disabled = L.seats[i] !== 'ai';
         kind.addEventListener('change', () => {
           if (kind.value === 'me') L.seats = L.seats.map((x, j) => (j !== i && x === 'me' ? 'human' : x));
           L.seats[i] = kind.value; save(); render();
         });
-        msel.addEventListener('change', () => { L.models[i] = msel.value; save(); });
-        seatRows.push(h('div', { class: 'seat-cfg' }, h('span', {}, dirNames[i]), kind, msel));
+        if (L.seats[i] === 'ai') {
+          const msel = modelOptions(L.models[i]);
+          msel.addEventListener('change', () => { L.models[i] = msel.value; save(); });
+          seatRows.push(h('div', { class: 'seat-cfg' }, h('span', {}, dirNames[i]), kind, msel));
+        } else {
+          seatRows.push(h('div', { class: 'seat-cfg human-seat' }, h('span', {}, dirNames[i]), kind));
+        }
       }
       seatRows.push(h('div', { class: 'hint' }, '出牌顺序为 1→2→3→4（逆时针）。每步限时 30 秒，超时系统随机出牌。座位都设为 AI 即可观战。'));
     } else {
@@ -254,7 +263,7 @@ export function mountPlay(app) {
         h('label', {}, '主牌甩牌'), rchk('allow_trump_throw', true, '允许甩主牌（副牌永远不可甩）'),
         h('label', {}, '单张扣底倍数'), rnum('koudi_single', 1, 1, 4, 1),
         h('label', {}, '对子扣底倍数'), rnum('koudi_pair', 2, 1, 8, 1),
-        h('label', {}, '双进单出'), rchk('shuang_jin_dan_chu', false, '庄家获胜倍数翻倍'),
+        h('label', {}, '双进单出'), rchk('shuang_jin_dan_chu', true, '庄家获胜倍数翻倍（默认开启）'),
         h('div', { class: 'full hint' }, '注：AI 模型以默认规则训练，修改规则后 AI 仍可正常出牌，但强度可能下降。')));
     const createBtn = h('button', { class: 'btn primary', onclick: () => {
       const seats = [];
@@ -366,21 +375,36 @@ export function mountPlay(app) {
   function fitStack(slot, codes, trump, cls, animate) {
     const el = h('div', { class: 'stack ' + (cls || '') });
     slot.append(el);
-    const style = getComputedStyle(document.documentElement);
-    const cw = parseFloat(style.getPropertyValue('--tcw')) || 50;
-    const avail = Math.max(cw, slot.clientWidth - 4);
+    if (!codes || !codes.length) return el;
+    // Measure real rendered mini-card size (CSS --tcw may use clamp() which parseFloat cannot parse)
+    const probe = cardEl(codes[0], { trump, mini: true });
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    el.append(probe);
+    const pr = probe.getBoundingClientRect();
+    const cw = pr.width || 40;
+    const ch = pr.height || 56;
+    probe.remove();
+
+    const avail = Math.max(cw * 2, slot.clientWidth - 4);
     const n = codes.length;
-    const minS = Math.max(11, Math.round(cw * 0.30));
-    let step = n > 1 ? Math.min(cw * 0.54, (avail - cw) / (n - 1)) : 0;
+    // .card.mini .idx occupies left ~16px; keep >= 19px step so rank, suit & 主 are 100% uncovered
+    const minS = Math.max(19, Math.ceil(cw * 0.54));
+    const maxS = Math.max(minS + 3, Math.round(cw * 0.70));
+    let step = n > 1 ? Math.min(maxS, (avail - cw) / (n - 1)) : 0;
     let perRow = n;
-    if (n > 1 && step < minS) { step = minS; perRow = Math.max(1, Math.floor((avail - cw) / step) + 1); }
+    if (n > 1 && step < minS) {
+      step = minS;
+      perRow = Math.max(2, Math.floor((avail - cw) / step) + 1);
+    }
     el.style.flexDirection = 'column';
     el.style.alignItems = 'center';
+    const rowOverlap = Math.max(0, Math.min(Math.round(ch * 0.36), Math.round(ch - 32)));
     for (let r = 0; r * perRow < n; r++) {
-      const row = h('div', { style: { display: 'flex', marginTop: r ? `-${Math.round(cw * 0.72)}px` : '0' } });
+      const row = h('div', { style: { display: 'flex', marginTop: r ? `-${rowOverlap}px` : '0' } });
       codes.slice(r * perRow, (r + 1) * perRow).forEach((c, k) => {
         const ce = cardEl(c, { trump, mini: true });
-        if (k) ce.style.marginLeft = `${step - cw}px`;
+        if (k) ce.style.marginLeft = `${Math.round(step - cw)}px`;
         row.append(ce);
       });
       el.append(row);

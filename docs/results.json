@@ -1,76 +1,74 @@
 {
  "model": "models/sandaha-best.npz",
- "deals": 6000,
+ "version": "2.2.0",
+ "rules": {
+  "shuang_jin_dan_chu": true
+ },
+ "deals": 3000,
+ "self_play_bidding_1000_deals": {
+  "avg_contract": 64.03,
+  "pct_below_70": 0.469,
+  "histogram": {
+   "5": 3,
+   "20": 4,
+   "25": 2,
+   "30": 6,
+   "35": 5,
+   "40": 14,
+   "45": 29,
+   "50": 70,
+   "55": 69,
+   "60": 235,
+   "65": 32,
+   "70": 398,
+   "75": 61,
+   "80": 72
+  }
+ },
  "rows": [
   {
-   "games": 12000,
-   "win_rate": 0.7610833333333333,
-   "avg_score": 2.2136666666666667,
-   "banker_rate": 0.17775,
-   "banker_win_rate": 0.6985466479137366,
-   "win_ci95": 0.007629652843359597,
-   "opponent": "规则AI rule",
-   "seconds": 112.2
+   "games": 6000,
+   "win_rate": 0.7213,
+   "avg_score": 2.320,
+   "banker_rate": 0.330,
+   "banker_win_rate": 0.563,
+   "win_ci95": 0.0113,
+   "avg_contract": 57.05,
+   "pct_below_70": 0.925,
+   "opponent": "规则AI rule (双进单出)"
   },
   {
-   "games": 12000,
-   "win_rate": 0.9994166666666666,
-   "avg_score": 5.633666666666667,
-   "banker_rate": 0.0025833333333333333,
-   "banker_win_rate": 0.7741935483870968,
-   "win_ci95": 0.0004320133217682068,
-   "opponent": "随机 random",
-   "seconds": 120.1
+   "games": 3000,
+   "win_rate": 0.9903,
+   "avg_score": 5.688,
+   "banker_rate": 0.028,
+   "banker_win_rate": 0.655,
+   "win_ci95": 0.0035,
+   "avg_contract": 13.30,
+   "pct_below_70": 0.989,
+   "opponent": "随机 random"
   },
   {
-   "games": 12000,
-   "win_rate": 0.5218333333333334,
-   "avg_score": 0.1325,
-   "banker_rate": 0.48733333333333334,
-   "banker_win_rate": 0.5109439124487004,
-   "win_ci95": 0.0089376018904319,
-   "opponent": "上一版正式模型 v1.0 (5371万局)",
-   "seconds": 143.6
+   "games": 6000,
+   "win_rate": 0.3995,
+   "avg_score": 0.288,
+   "banker_rate": 0.810,
+   "banker_win_rate": 0.389,
+   "win_ci95": 0.0124,
+   "avg_contract": 71.70,
+   "pct_below_70": 0.180,
+   "opponent": "上一版模型 v2.0 sandaha-best (4516万局, 单进单出)"
   },
   {
-   "games": 12000,
-   "win_rate": 0.5175833333333333,
-   "avg_score": 0.12216666666666667,
-   "banker_rate": 0.507,
-   "banker_win_rate": 0.4896449704142012,
-   "win_ci95": 0.00894060157677489,
-   "opponent": "同一训练 @14700k 局",
-   "seconds": 168.0
-  },
-  {
-   "games": 12000,
-   "win_rate": 0.5044166666666666,
-   "avg_score": 0.042333333333333334,
-   "banker_rate": 0.50825,
-   "banker_win_rate": 0.4766355140186916,
-   "win_ci95": 0.008945786075588057,
-   "opponent": "同一训练 @30788k 局",
-   "seconds": 164.6
-  },
-  {
-   "games": 12000,
-   "win_rate": 0.5185833333333333,
-   "avg_score": 0.14,
-   "banker_rate": 0.49433333333333335,
-   "banker_win_rate": 0.4967970330411328,
-   "win_ci95": 0.008939954049047124,
-   "opponent": "轻量版 v2.0 sandaha-lite (1255万局)",
-   "seconds": 139.7
-  },
-  {
-   "games": 12000,
-   "win_rate": 0.6256666666666667,
-   "avg_score": 0.9976666666666667,
-   "banker_rate": 0.51225,
-   "banker_win_rate": 0.6136326663413048,
-   "win_ci95": 0.008658969463103733,
-   "opponent": "旧轻量版 v1.0 sandaha-lite (40.5万局)",
-   "seconds": 119.2
+   "games": 6000,
+   "win_rate": 0.5192,
+   "avg_score": 0.081,
+   "banker_rate": 0.464,
+   "banker_win_rate": 0.416,
+   "win_ci95": 0.0126,
+   "avg_contract": 63.39,
+   "pct_below_70": 0.522,
+   "opponent": "同代轻量版 v2.2 sandaha-lite (2347万局, 双进单出)"
   }
  ]
 }

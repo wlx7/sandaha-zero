@@ -30,7 +30,8 @@ def duel(agent_a, agent_b, n_deals=100, rules=None, seed=0, progress=None):
     rules = rules or Rules()
     rng = random.Random(seed)
     stats = {"games": 0, "a_score": 0.0, "a_wins": 0.0, "a_banker_games": 0, "a_banker_wins": 0,
-             "b_banker_games": 0, "b_banker_wins": 0, "a_xian_games": 0, "a_xian_wins": 0}
+             "b_banker_games": 0, "b_banker_wins": 0, "a_xian_games": 0, "a_xian_wins": 0,
+             "contract_sum": 0.0, "below_70": 0}
     for d in range(n_deals):
         hands, bottom = random_deal(rng)
         fb = rng.randrange(4)
@@ -43,6 +44,9 @@ def duel(agent_a, agent_b, n_deals=100, rules=None, seed=0, progress=None):
             stats["games"] += 1
             stats["a_score"] += a
             stats["a_wins"] += 1.0 if a > 0 else (0.5 if a == 0 else 0.0)
+            stats["contract_sum"] += g.result["contract"]
+            if g.result["contract"] < 70:
+                stats["below_70"] += 1
             banker = g.result["banker"]
             banker_won = not g.result["xian_win"]
             if banker in a_seats:
@@ -63,4 +67,6 @@ def duel(agent_a, agent_b, n_deals=100, rules=None, seed=0, progress=None):
         "banker_rate": stats["a_banker_games"] / n,
         "banker_win_rate": stats["a_banker_wins"] / max(1, stats["a_banker_games"]),
         "opp_banker_win_rate": stats["b_banker_wins"] / max(1, stats["b_banker_games"]),
+        "avg_contract": round(stats["contract_sum"] / n, 2),
+        "pct_below_70": round(stats["below_70"] / n, 4),
     }

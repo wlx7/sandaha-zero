@@ -127,7 +127,8 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 .tag.gold { background: #4a3b10; color: var(--gold2); }
 .tag.green { background: #164d33; color: #8ff0bf; }
 .tag.red { background: #5a1d1d; color: #ffb3b3; }
-.seat-cfg { display: grid; grid-template-columns: 62px minmax(0, 118px) minmax(0, 1fr); gap: 6px; align-items: center; margin-bottom: 6px; }
+.seat-cfg { display: grid; grid-template-columns: 62px minmax(0, 128px) minmax(0, 1fr); gap: 6px; align-items: center; margin-bottom: 6px; }
+.seat-cfg.human-seat { grid-template-columns: 62px minmax(0, 160px); }
 .lobby-top-row { justify-content: space-between; }
 .manage-grid { display: flex; flex-direction: column; gap: 8px; }
 .manage-grid > .btn { width: 100%; }
@@ -213,10 +214,10 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
     "pleft mid  pright"
     "pleft pme  pright";
   gap: 4px 8px; align-items: center; min-height: 0; position: relative; }
-.pslot { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; padding: 1px; }
+.pslot { width: 100%; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; padding: 1px; }
 .pslot.p-top { grid-area: ptop; align-self: end; }
-.pslot.p-left { grid-area: pleft; justify-self: center; }
-.pslot.p-right { grid-area: pright; justify-self: center; }
+.pslot.p-left { grid-area: pleft; }
+.pslot.p-right { grid-area: pright; }
 .pslot.p-me { grid-area: pme; align-self: start; }
 .mid { grid-area: mid; justify-self: center; display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; text-align: center; color: #dceee6; font-size: .84rem; padding: 4px 12px; border-radius: 12px;
@@ -374,7 +375,8 @@ table.evals th:first-child, table.evals td:first-child { text-align: left; }
   .lobby-grid { grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr); gap: 8px; }
   .lobby-top-row { margin-bottom: 6px !important; }
   .seg button { padding: 4px 10px; font-size: .84rem; }
-  .seat-cfg { gap: 4px; margin-bottom: 4px; grid-template-columns: 48px minmax(0, 108px) minmax(0, 1fr); }
+  .seat-cfg { gap: 4px; margin-bottom: 4px; grid-template-columns: 48px minmax(0, 116px) minmax(0, 1fr); }
+  .seat-cfg.human-seat { grid-template-columns: 48px minmax(0, 148px); }
   .seat-cfg select { padding: 3px 6px; font-size: .82rem; }
   .lobby-page .hint { font-size: .76rem; line-height: 1.28; }
   .lobby-delay-row { margin-top: 5px !important; }

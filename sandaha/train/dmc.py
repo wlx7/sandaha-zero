@@ -26,7 +26,7 @@ import traceback
 
 import numpy as np
 
-PHASE_SHARE = {"play": 1.0, "bury": 0.20, "bid": 0.20, "trump": 0.08}
+PHASE_SHARE = {"play": 1.0, "bury": 0.22, "bid": 0.30, "trump": 0.12}
 
 
 def _write_json(path, obj):
@@ -134,7 +134,10 @@ def _batched_actor(
     b_path = cfg.baseline or cfg.teacher_model
     if b_path and os.path.exists(b_path):
         try:
-            baseline_opp = Model.load(b_path)
+            cand_opp = Model.load(b_path)
+            b_sjdc = bool((cand_opp.meta.get("rules") or {}).get("shuang_jin_dan_chu", False))
+            if b_sjdc == bool(rules.shuang_jin_dan_chu):
+                baseline_opp = cand_opp
         except Exception:
             baseline_opp = None
 
@@ -200,9 +203,13 @@ def _batched_actor(
         local_n = max(0, games_counter.value - init_games_offset)
         frac = min(1.0, local_n / max(1, cfg.epsilon_decay_games))
         eps = cfg.epsilon_start + (cfg.epsilon_end - cfg.epsilon_start) * frac
+        if cfg.bid_eps_start > 0.0:
+            b_eps = cfg.bid_eps_start + (cfg.bid_eps_end - cfg.bid_eps_start) * frac
+        else:
+            b_eps = min(0.35, eps * 2.5)
         if base_sigma <= 0.0:
-            return (0.0 if frac >= 1.0 else eps * 0.25), 0.0
-        return eps, base_sigma
+            return (0.0 if frac >= 1.0 else eps * 0.25), (0.0 if frac >= 1.0 else b_eps * 0.25), 0.0
+        return eps, b_eps, base_sigma
 
     slots = []
     pending = []
@@ -229,7 +236,7 @@ def _batched_actor(
             while len(slots) < K:
                 slots.append(new_slot())
 
-            eps, sigma = epsilon_and_sigma()
+            eps, b_eps, sigma = epsilon_and_sigma()
             latest_groups = {}
             opp_model_groups = {}
 
@@ -279,15 +286,27 @@ def _batched_actor(
 
             # Batch-evaluate learner decisions
             for ph, items in latest_groups.items():
+                ph_eps = b_eps if ph in ("bid", "trump") else eps
+                ph_sigma = (sigma * 2.5) if ph in ("bid", "trump") else sigma
                 outs = model.q_batch(ph, [it[3] for it in items], [it[4] for it in items])
                 for (i, s, acts, st, A), out in zip(items, outs):
                     m_acts = len(acts)
                     if m_acts == 1:
                         j = 0
-                    elif eps > 0.0 and rng.random() < eps:
-                        j = rng.randrange(m_acts)
-                    elif sigma > 0.0:
-                        noisy_q = out[:, 0] + np_rng.normal(0.0, sigma, size=m_acts)
+                    elif ph_eps > 0.0 and rng.random() < ph_eps:
+                        if ph == "bid" and m_acts > 4 and rng.random() < 0.85:
+                            # Auction-ladder exploration: focus on PASS + top 4 competitive undercuts
+                            bid_idxs = [k for k, v in enumerate(acts) if v != 0]
+                            bid_idxs.sort(key=lambda k: -acts[k])
+                            plausible = bid_idxs[:4]
+                            for k, v in enumerate(acts):
+                                if v == 0:
+                                    plausible.append(k)
+                            j = rng.choice(plausible)
+                        else:
+                            j = rng.randrange(m_acts)
+                    elif ph_sigma > 0.0:
+                        noisy_q = out[:, 0] + np_rng.normal(0.0, ph_sigma, size=m_acts)
                         j = int(np.argmax(noisy_q))
                     else:
                         j = int(np.argmax(out[:, 0]))
@@ -430,6 +449,9 @@ def train(cfg, run_dir, log=print):
         cfg.arch_type = sd_meta.get("arch_type", "mlp_v1")
         cfg.feat_ver = int(sd_meta.get("feat_ver", 2 if cfg.arch_type == "dueling_film_v2" else 1))
 
+    # Ensure cfg.rules explicitly records default Rules fields (e.g. shuang_jin_dan_chu=True)
+    from ..rules import Rules
+    cfg.rules = Rules.from_dict(cfg.rules).to_dict()
     cfg.save(os.path.join(run_dir, "config.json"))
     dm = dims_for(cfg.feat_ver)
     net = SanDaHaNet(arch, arch_type=cfg.arch_type, feat_ver=cfg.feat_ver).to(device)
@@ -489,15 +511,15 @@ def train(cfg, run_dir, log=print):
     }
     phase_replay_warm = {
         "play": cfg.replay_ratio,
-        "bury": cfg.replay_ratio * 2.0,
-        "bid": cfg.replay_ratio * 2.0,
-        "trump": cfg.replay_ratio * 3.0,
+        "bury": cfg.replay_ratio * 2.2,
+        "bid": cfg.replay_ratio * 3.0,
+        "trump": cfg.replay_ratio * 3.5,
     }
     phase_replay_steady = {
         "play": cfg.replay_ratio,
         "bury": cfg.replay_ratio * 2.2,
-        "bid": cfg.replay_ratio * 2.2,
-        "trump": cfg.replay_ratio * 2.0,
+        "bid": cfg.replay_ratio * 3.0,
+        "trump": cfg.replay_ratio * 3.0,
     }
 
     def base_lr_at(now, games):
@@ -667,7 +689,8 @@ def train(cfg, run_dir, log=print):
                         if (cfg.warmup_steps > 0 and steps[p] < eff_warmup)
                         else 1.0
                     )
-                    step_lr = cur_lr * w_mult
+                    ph_lr_mult = cfg.aux_lr_mult if p in ("bid", "trump") else 1.0
+                    step_lr = cur_lr * w_mult * ph_lr_mult
                     for grp in p_opt.param_groups:
                         grp["lr"] = step_lr
 

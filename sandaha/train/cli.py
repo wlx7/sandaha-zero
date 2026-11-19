@@ -62,6 +62,10 @@ def main(argv=None):
     t.add_argument("--q-noise-max", type=float)
     t.add_argument("--eps-start", type=float)
     t.add_argument("--eps-end", type=float)
+    t.add_argument("--eps-decay-games", type=int)
+    t.add_argument("--bid-eps-start", type=float)
+    t.add_argument("--bid-eps-end", type=float)
+    t.add_argument("--aux-lr-mult", type=float)
     t.add_argument("--eval-minutes", type=float)
     t.add_argument("--eval-deals", type=int)
     t.add_argument("--device")
@@ -108,6 +112,10 @@ def main(argv=None):
             ("q_noise_max", "q_noise_max"),
             ("eps_start", "epsilon_start"),
             ("eps_end", "epsilon_end"),
+            ("eps_decay_games", "epsilon_decay_games"),
+            ("bid_eps_start", "bid_eps_start"),
+            ("bid_eps_end", "bid_eps_end"),
+            ("aux_lr_mult", "aux_lr_mult"),
             ("eval_minutes", "eval_every_minutes"),
             ("eval_deals", "eval_deals"),
             ("device", "device"),

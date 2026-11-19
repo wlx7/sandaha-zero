@@ -38,7 +38,7 @@ class Rules:
     kua_zhuang_xian: int = 1    # 闲 reached the bid
     xiao_dao_margin: int = 40   # 闲 >= bid + 40 -> 小倒 (x2)
     da_dao_margin: int = 70     # 闲 >= bid + 70 -> 大倒 (x3)
-    shuang_jin_dan_chu: bool = False  # 双进单出: banker wins count double
+    shuang_jin_dan_chu: bool = True   # 双进单出: banker wins count double (Hunan standard)
 
     def bid_values(self) -> list[int]:
         return list(range(self.max_bid, self.min_bid - 1, -self.bid_step))

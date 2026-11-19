@@ -159,13 +159,16 @@ def _settle(points, contract, **kw):
 
 
 def test_settlement_table():
-    assert _settle(0, 60)["tier"] == "大光" and _settle(0, 60)["scores"] == [9, -3, -3, -3]
-    assert _settle(30, 60)["tier"] == "小光"
-    assert _settle(35, 60)["tier"] == "保庄" and _settle(35, 60)["scores"][0] == 3
+    # Default rules have shuang_jin_dan_chu=True (banker wins doubled)
+    assert _settle(0, 60)["tier"] == "大光" and _settle(0, 60)["scores"] == [18, -6, -6, -6]
+    assert _settle(30, 60)["tier"] == "小光" and _settle(30, 60)["scores"] == [12, -4, -4, -4]
+    assert _settle(35, 60)["tier"] == "保庄" and _settle(35, 60)["scores"] == [6, -2, -2, -2]
     assert _settle(60, 60)["tier"] == "下庄" and _settle(60, 60)["scores"] == [-3, 1, 1, 1]
     assert _settle(100, 60)["tier"] == "小倒" and _settle(100, 60)["scores"][1] == 2
     assert _settle(130, 60)["tier"] == "大倒" and _settle(130, 60)["scores"][0] == -9
-    assert _settle(35, 60, shuang_jin_dan_chu=True)["scores"][0] == 6
+    # Single-in single-out (shuang_jin_dan_chu=False)
+    assert _settle(0, 60, shuang_jin_dan_chu=False)["scores"] == [9, -3, -3, -3]
+    assert _settle(35, 60, shuang_jin_dan_chu=False)["scores"][0] == 3
 
 
 def test_surrender():

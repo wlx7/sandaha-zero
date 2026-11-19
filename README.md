@@ -1,4 +1,4 @@
-# SanDaHa-Zero · 三打哈 AI (v2.1)
+# SanDaHa-Zero · 三打哈 AI (v2.2)
 
 **English** | [中文](README.zh-CN.md)
 
@@ -6,7 +6,7 @@ A self-play reinforcement-learning AI for **San Da Ha (三打哈)**, the Hunan t
 
 - **Full rules**: bidding (including the forced-bid rule for 7+ permanent trumps), trump choice (including no-trump), surrender, burying the bottom, singles / pairs / tractors, trump throws (**side-suit throws are not allowed**), ruffing and discarding, bottom-capture (扣底) multipliers, and the complete 大光/小光/保庄/下庄/小倒/大倒 settlement. See [docs/RULES.zh-CN.md](docs/RULES.zh-CN.md).
 - **One model makes every decision**: bidding, trump or surrender, burying, and card play (including going for 扣底), directly optimizing **expected settlement score including multipliers**.
-- **v2.0 Playing-Strength Breakthrough**: powered by a new **Dueling FiLM-ResNet** architecture (`dueling_film_v2`), **Tactical Feature Set v2** (`pair_void` deduction, bidding memory, exact settlement step margins, boss-card & closing-4th-seat detection), **League Self-Play**, and **EMA/SWA** checkpoint fusion. Across 12,000 duplicate games, `sandaha-best` v2.0 defeats the 53.7M-game v1.0 release model **52.2% ± 0.9** (**+0.13** base stakes/game, $p < 10^{-6}$), and even the 2.37M-parameter lightweight `sandaha-lite` v2.0 matches v1.0 `medium` (**49.5% ± 1.3**) while beating `RuleBot` **76.0% (+2.14)**.
+- **v2.2 Double-In Single-Out (`双进单出`) Breakthrough**: switches default rules to authentic Hunan **双进单出** (Banker wins pay double: 保庄 ×2, 小光 ×4, 大光 ×6) and trains `sandaha-best` (**51.1M games**, 4.67M params) & `sandaha-lite` (**23.5M games**, 2.37M params) with **Auction-Ladder Bid Exploration + Phase-Decoupled AdamW + SWA**. Self-play average contract drops from `76.8` to **`64.0`** (`46.9%` of hands contested `< 70` down to `60/50/40/5`), beating v2.0 `sandaha-best` by **`+0.29` net base stakes/game** and `RuleBot` by **`+2.32` net base stakes/game** over 6,000 duplicate games.
 - **Zero-setup deployment**: inference uses pure `numpy` (no PyTorch or GPU required). Grab the ready-to-run Windows `.exe` or Android `.apk` from Releases.
 
 ![teaching mode](docs/img/table.jpg)

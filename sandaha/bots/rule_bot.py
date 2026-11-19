@@ -69,6 +69,8 @@ class RuleBot:
     # ------------------------------------------------------------ bidding --
     def target_bid(self, hand_strength, rules, with_bottom=False):
         base = self.bid_base + (2.5 if with_bottom else 0)
+        if getattr(rules, "shuang_jin_dan_chu", False):
+            base -= 4.5  # banker wins pay 2x -> bid ~10-15 pts lower aggressively
         if hand_strength < base:
             return None
         steps = int((hand_strength - base) / self.bid_slope)

@@ -30,6 +30,9 @@ class TrainConfig:
     epsilon_start: float = 0.10
     epsilon_end: float = 0.003
     epsilon_decay_games: int = 350_000
+    bid_eps_start: float = 0.0          # 0 = auto (2.5x epsilon); >0 = dedicated bid/trump exploration
+    bid_eps_end: float = 0.0
+    aux_lr_mult: float = 1.0            # LR multiplier for bid & trump phases (useful on warm start)
     q_noise_min: float = 0.002          # Ape-X plausible Q-perturbation min std (in score/9)
     q_noise_max: float = 0.032          # Ape-X plausible Q-perturbation max std (in score/9)
     league_frac: float = 0.20           # fraction of games played against league pool (historical/baseline/rule)
