@@ -1,4 +1,4 @@
-# SanDaHa-Zero · 三打哈 AI (v2.0)
+# SanDaHa-Zero · 三打哈 AI (v2.1)
 
 [English](README.md) | **中文**
 
@@ -19,8 +19,8 @@
 
 前往 [**GitHub Releases**](https://github.com/wlx7/sandaha-zero/releases/latest) 下载对应平台文件：
 
-- **Windows 电脑**：下载 `SanDaHa-Zero-Windows-x64.exe`，双击即可启动本地服务并打开浏览器（内置 `sandaha-best` 与 `sandaha-lite` 双 v2.0 模型，无需安装 Python）。
-- **Android 手机 / 平板**：下载 `SanDaHa-Zero-Android.apk` 安装即可离线畅玩对战模式与教学点评（内置嵌入式 Python 3.11 + NumPy 推理引擎；同一 Wi-Fi 下其他手机也可扫码加入房间）。
+- **Windows 电脑**：下载 `SanDaHa-Zero-Windows-x64.exe`，双击即可启动本地服务并打开浏览器（纯粹对弈/教学精简版，剥离训练依赖，内置 `sandaha-best` 与 `sandaha-lite` 双 v2.0 模型，无需安装 Python）。
+- **Android 手机 / 平板**：下载 `SanDaHa-Zero-Android.apk` 安装即可离线畅玩对战模式与教学点评（支持沉浸式全屏与横竖屏一屏自适应布局，内置嵌入式 Python 3.11 + NumPy 推理引擎；同一 Wi-Fi 下其他手机也可扫码加入房间）。
 
 ### 方式二：从源码运行
 
@@ -53,7 +53,9 @@ sandaha --port 9000 --no-browser
 - **历史**：本局叫分记录、每一轮出牌（谁出了什么、谁赢、几分）、往局战绩。
 - 自动标注已知缺门（“缺♠”）。结算面板显示扣底倍数、各家得分、累计积分、底牌。
 
-### 训练中心
+### 训练中心（仅源码模式）
+
+> 注：Windows 单文件 `.exe` 与 Android `.apk` 为纯粹对弈/教学版本，已移除训练模块；如需自对弈训练与模型评测，请从源码启动（`start.bat` / `uv run sandaha`）。
 
 - 可调参数：模型架构与大小（`tiny/small/medium/large/xlarge`）、设备（CPU/GPU）、自对弈进程数、学习率与余弦衰减、批大小、样本复用率、Ape-X Q 噪声探索、联赛自对弈比例、基准模型、热启动续训、投降课程。
 - 实时图表：对规则 AI / 对基准模型 / 对上一检查点的胜率曲线、每局净得分、做庄胜率、四个网络的损失、自对弈速度。

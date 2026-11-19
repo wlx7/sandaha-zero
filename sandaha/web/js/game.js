@@ -40,9 +40,29 @@ export function mountPlay(app) {
   api('/api/models').then((r) => { st.models = r.models; st.defaultModel = r.default; if (!st.view || !st.view.room) render(); }).catch(() => {});
   send({ op: 'sync' });
 
-  const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(render, 120); };
+  const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(render, 100); };
   window.addEventListener('resize', onResize);
   timerInt = setInterval(tick, 250);
+
+  window.__sdhPlayBack = () => {
+    if (st.panel) {
+      st.panel = null;
+      store.set('sdh.panel', null);
+      render();
+      return true;
+    }
+    if (st.view && st.view.room) {
+      const v = st.view;
+      if (v.phase === 'play' && v.my_seat !== null && !confirm('对局进行中，确定离开房间？')) {
+        return true;
+      }
+      send({ op: 'leave_room' });
+      st.view = null;
+      render();
+      return true;
+    }
+    return false;
+  };
 
   function render() {
     app.innerHTML = '';
@@ -54,7 +74,7 @@ export function mountPlay(app) {
     const opts = [h('option', { value: 'rule' }, '规则AI (基准)'), h('option', { value: 'random' }, '随机AI')];
     for (const m of st.models.filter((x) => x.kind !== 'checkpoint')) {
       opts.push(h('option', { value: m.path }, m.label));
-      opts.push(h('option', { value: m.path + '?search' }, `${m.label} + 搜索增强（更强，稍慢）`));
+      opts.push(h('option', { value: m.path + '?search' }, `${m.label} + 搜索增强`));
     }
     const ck = st.models.filter((x) => x.kind === 'checkpoint').slice(-12);
     if (ck.length) opts.push(h('optgroup', { label: '训练检查点' }, ck.map((m) => h('option', { value: m.path }, m.label))));
@@ -88,14 +108,14 @@ export function mountPlay(app) {
         msel.addEventListener('change', () => { L.models[i] = msel.value; save(); });
         seatRows.push(h('div', { class: 'seat-cfg' }, h('span', {}, dirNames[i]), kind, msel));
       }
-      seatRows.push(h('div', { class: 'hint' }, '出牌顺序为 1→2→3→4（逆时针）。每步限时 30 秒，超时系统随机出牌。座位都设为 AI 即可观战 AI 对局。'));
+      seatRows.push(h('div', { class: 'hint' }, '出牌顺序为 1→2→3→4（逆时针）。每步限时 30 秒，超时系统随机出牌。座位都设为 AI 即可观战。'));
     } else {
       const msel = modelOptions(L.models[1]);
       msel.addEventListener('change', () => { L.models = [null, msel.value, msel.value, msel.value]; save(); });
       seatRows.push(h('div', { class: 'form' }, h('label', {}, '对手 / 教练 AI'), msel));
-      seatRows.push(h('div', { class: 'hint', style: { marginTop: '8px' } }, '教学模式：你与三个 AI 对局，无时间限制；可查看所有 AI 手牌，AI 会对每一步给出点评（期望得分、胜率、预测闲家得分），并可随时请求提示。'));
+      seatRows.push(h('div', { class: 'hint', style: { marginTop: '6px' } }, '教学模式：你与三个 AI 对局，不限时；可查看所有 AI 手牌，每步均有期望得分与胜率点评，并可随时请求提示。'));
     }
-    const delay = h('input', { type: 'range', min: 0, max: 3, step: 0.1, value: L.ai_delay, style: { width: '100%' } });
+    const delay = h('input', { type: 'range', min: 0, max: 3, step: 0.1, value: L.ai_delay, style: { flex: '1', minWidth: '100px' } });
     const delayLbl = h('span', { class: 'hint' }, `${L.ai_delay}s`);
     delay.addEventListener('input', () => { L.ai_delay = +delay.value; delayLbl.textContent = `${L.ai_delay}s`; save(); });
     const R = L.rules;
@@ -146,11 +166,11 @@ export function mountPlay(app) {
       h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => { location.hash = '#/'; } }, '← 首页'),
         h('h2', {}, '对弈大厅'), h('span', { class: 'hint' }, `昵称：${me.name}`),
         h('button', { class: 'btn sm ghost', onclick: showRules }, '规则')),
-      h('div', { class: 'grid2' },
-        h('div', { class: 'card-box' }, h('h3', {}, '新建对局'), h('div', { class: 'row', style: { marginBottom: '12px' } }, modeSeg),
+      h('div', { class: 'grid2 lobby-grid' },
+        h('div', { class: 'card-box' }, h('h3', {}, '新建对局'), h('div', { class: 'row', style: { marginBottom: '10px' } }, modeSeg),
           ...seatRows,
-          h('div', { class: 'form', style: { marginTop: '10px' } }, h('label', {}, 'AI 出牌间隔'), h('div', { class: 'row' }, delay, delayLbl)),
-          adv, h('div', { class: 'row', style: { marginTop: '12px' } }, createBtn)),
+          h('div', { class: 'form', style: { marginTop: '8px' } }, h('label', {}, 'AI 出牌间隔'), h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, delay, delayLbl)),
+          adv, h('div', { class: 'row', style: { marginTop: '10px' } }, createBtn)),
         h('div', { class: 'card-box' }, h('h3', {}, '加入房间', h('button', { class: 'btn sm ghost', onclick: () => send({ op: 'list_rooms' }) }, '刷新')), roomList))));
   }
 
@@ -179,7 +199,7 @@ export function mountPlay(app) {
       s.kind === 'open' ? '?' : (isAI ? 'AI' : (seatName(i)[0] || '玩')),
       v.banker === i ? h('span', { class: 'badge' }, '庄') : null);
     const sub = h('div', { class: 'sub' });
-    if (v.phase) sub.append(h('span', {}, `剩 ${v.hand_counts[i]} 张`));
+    if (v.phase) sub.append(h('span', {}, `剩${v.hand_counts[i]}张`));
     if (s.kind === 'human' && s.connected === false) sub.append(h('span', { class: 'tag red' }, '离线'));
     if (v.totals) sub.append(h('span', { class: v.totals[i] >= 0 ? 'pos' : 'neg' }, `${v.totals[i] >= 0 ? '+' : ''}${v.totals[i]}`));
     if (v.phase === 'bid') {
@@ -208,15 +228,16 @@ export function mountPlay(app) {
     slot.append(el);
     const style = getComputedStyle(document.documentElement);
     const cw = parseFloat(style.getPropertyValue('--tcw')) || 50;
-    const avail = Math.max(cw, slot.clientWidth - 6);
+    const avail = Math.max(cw, slot.clientWidth - 4);
     const n = codes.length;
-    let step = n > 1 ? Math.min(cw * 0.55, (avail - cw) / (n - 1)) : 0;
+    const minS = Math.max(11, Math.round(cw * 0.30));
+    let step = n > 1 ? Math.min(cw * 0.54, (avail - cw) / (n - 1)) : 0;
     let perRow = n;
-    if (n > 1 && step < 15) { step = 15; perRow = Math.max(1, Math.floor((avail - cw) / step) + 1); }
+    if (n > 1 && step < minS) { step = minS; perRow = Math.max(1, Math.floor((avail - cw) / step) + 1); }
     el.style.flexDirection = 'column';
     el.style.alignItems = 'center';
     for (let r = 0; r * perRow < n; r++) {
-      const row = h('div', { style: { display: 'flex', marginTop: r ? `-${Math.round(cw * 0.75)}px` : '0' } });
+      const row = h('div', { style: { display: 'flex', marginTop: r ? `-${Math.round(cw * 0.72)}px` : '0' } });
       codes.slice(r * perRow, (r + 1) * perRow).forEach((c, k) => {
         const ce = cardEl(c, { trump, mini: true });
         if (k) ce.style.marginLeft = `${step - cw}px`;
@@ -228,33 +249,70 @@ export function mountPlay(app) {
     return el;
   }
 
+  function showBuriedModal() {
+    const v = st.view;
+    if (!v || !v.buried) return;
+    const pts = v.buried.reduce((a, c) => a + cardPts(c), 0);
+    const m = modal(h('div', {},
+      h('h2', {}, '已埋底牌'),
+      h('div', { class: 'row', style: { justifyContent: 'center', gap: '6px', margin: '10px 0' } },
+        v.buried.map((c) => cardEl(c, { trump: v.trump, mini: true }))),
+      h('div', { class: 'hint', style: { textAlign: 'center' } }, `共 8 张 · 底牌分 ${pts} 分`),
+      h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } },
+        h('button', { class: 'btn primary', onclick: () => m.close() }, '关闭'))));
+  }
+
   function renderTable() {
     const v = st.view;
     const teach = v.mode === 'teach';
+    const compactScreen = (window.innerWidth || 1024) <= 900 || (window.innerHeight || 768) <= 540;
     const wrap = h('div', { class: 'table-wrap' + (teach && st.reveal ? ' reveal' : '') });
+
     // ---- top bar
     const info = h('div', { class: 'info' });
-    info.append(h('span', { class: 'pill' }, teach ? '教学' : '对战', v.hand_no ? ` · 第 ${v.hand_no} 局` : ''));
+    info.append(h('span', { class: 'pill' }, teach ? '教学' : '对战', v.hand_no ? `·${v.hand_no}局` : ''));
     if (v.phase) info.append(h('span', { class: 'pill' }, PHASE_NAMES[v.phase] || v.phase));
     if (v.banker !== null && v.banker !== undefined) info.append(h('span', { class: 'pill' }, '庄 ', h('b', {}, seatName(v.banker))));
     if (v.contract) info.append(h('span', { class: 'pill' }, '庄分 ', h('b', {}, v.contract)));
     else if (v.best_bid) info.append(h('span', { class: 'pill' }, '当前 ', h('b', {}, v.best_bid)));
     if (v.trump_label) info.append(h('span', { class: 'pill' }, '主 ', h('b', {}, v.trump_label)));
-    if (v.phase === 'play' || v.phase === 'over') info.append(h('span', { class: 'pill' }, '闲家得分 ', h('b', {}, `${v.xian_points}`), v.contract ? ` / ${v.contract}` : ''));
+    if (v.phase === 'play' || v.phase === 'over') info.append(h('span', { class: 'pill' }, '闲 ', h('b', {}, `${v.xian_points}`), v.contract ? `/${v.contract}` : ''));
+
     const tbtn = (key, text) => h('button', { class: 'btn sm' + (st.panel === key ? ' on' : ''), onclick: () => togglePanel(key) }, text);
-    const tools = h('div', { class: 'tools' }, tbtn('counter', '记牌器'), tbtn('history', '历史'));
+    const tools = h('div', { class: 'tools' });
+    if (v.buried && (v.phase === 'play' || v.phase === 'over')) {
+      tools.append(h('button', { class: 'btn sm', onclick: showBuriedModal }, '底牌'));
+    }
+    tools.append(tbtn('counter', '记牌器'), tbtn('history', '历史'));
     if (teach) {
       tools.append(tbtn('comments', '点评'));
-      tools.append(h('button', { class: 'btn sm' + (st.reveal ? ' on' : ''), onclick: () => { st.reveal = !st.reveal; store.set('sdh.reveal', st.reveal); render(); } }, 'AI手牌'));
+      tools.append(h('button', {
+        class: 'btn sm' + ((compactScreen ? st.panel === 'hands' : st.reveal) ? ' on' : ''),
+        onclick: () => {
+          if (compactScreen) {
+            togglePanel('hands');
+          } else {
+            st.reveal = !st.reveal;
+            store.set('sdh.reveal', st.reveal);
+            render();
+          }
+        },
+      }, 'AI手牌'));
     }
     tools.append(h('button', { class: 'btn sm ghost', onclick: showRules }, '规则'));
-    tools.append(h('button', { class: 'btn sm ghost', onclick: () => { if (v.phase === 'play' && v.my_seat !== null && !confirm('对局进行中，确定离开？')) return; send({ op: 'leave_room' }); st.view = null; render(); } }, '离开'));
+    tools.append(h('button', { class: 'btn sm ghost', onclick: () => {
+      if (v.phase === 'play' && v.my_seat !== null && !confirm('对局进行中，确定离开？')) return;
+      send({ op: 'leave_room' });
+      st.view = null;
+      render();
+    } }, '离开'));
     wrap.append(h('div', { class: 'topbar' }, info, tools));
 
     // ---- felt
     const felt = h('div', { class: 'felt' });
     const seatsByRel = [0, 1, 2, 3].map((r) => (viewer() + r) % 4);
     felt.append(seatBox(seatsByRel[2], 'top'), seatBox(seatsByRel[3], 'left'), seatBox(seatsByRel[1], 'right'));
+
     const center = h('div', { class: 'center' });
     const slots = {};
     for (const [r, c] of [[2, 'p-top'], [3, 'p-left'], [1, 'p-right'], [0, 'p-me']]) {
@@ -264,38 +322,49 @@ export function mountPlay(app) {
     center.append(midInfo());
     felt.append(center);
 
-    // my row
-    const myRow = h('div', { class: 'seat-me' });
+    // ---- unified bottom control bar + hand
+    const meStatus = h('div', { class: 'me-status' });
     const ms = v.my_seat;
     if (ms !== null && ms !== undefined) {
       const active = v.phase && v.phase !== 'over' && v.to_act === ms;
-      myRow.append(h('div', { class: 'avatar' + (active ? ' active' : ''), style: { width: '34px', height: '34px', fontSize: '.9rem' } },
+      meStatus.append(h('div', { class: 'avatar me-av' + (active ? ' active' : '') },
         seatName(ms)[0] || '我', v.banker === ms ? h('span', { class: 'badge' }, '庄') : null));
-      myRow.append(h('b', {}, seatName(ms)));
-      if (v.totals) myRow.append(h('span', { class: v.totals[ms] >= 0 ? 'pos' : 'neg' }, `总分 ${v.totals[ms] >= 0 ? '+' : ''}${v.totals[ms]}`));
+      meStatus.append(h('b', { class: 'me-name' }, seatName(ms)));
+      if (v.totals) meStatus.append(h('span', { class: (v.totals[ms] >= 0 ? 'pos' : 'neg') + ' me-score' }, `${v.totals[ms] >= 0 ? '+' : ''}${v.totals[ms]}`));
       if (v.phase === 'bid') {
         const b = lastBid(ms);
-        if (b !== undefined) myRow.append(h('span', { class: 'bubble' + (b === 0 ? ' pass' : '') }, b === 0 ? '不叫' : `${b}分`));
+        if (b !== undefined) meStatus.append(h('span', { class: 'bubble' + (b === 0 ? ' pass' : '') }, b === 0 ? '不叫' : `${b}分`));
       }
-      if (active && v.deadline) myRow.append(h('div', { class: 'timer', 'data-deadline': v.deadline, style: { width: '120px' } }, h('i', {})), h('span', { class: 'hint', 'data-countdown': v.deadline }, ''));
-      if (v.buried && v.phase === 'play') myRow.append(h('span', { class: 'hint' }, '底牌：'), h('span', { class: 'chips' }, v.buried.map((c) => chipEl(c, v.trump))));
+      if (active && v.deadline) {
+        meStatus.append(
+          h('div', { class: 'timer me-timer', 'data-deadline': v.deadline }, h('i', {})),
+          h('span', { class: 'hint me-cd', 'data-countdown': v.deadline }, '')
+        );
+      }
+      if (v.buried && v.phase === 'play') {
+        meStatus.append(h('span', { class: 'buried-inline' },
+          h('span', { class: 'hint' }, '底牌：'),
+          h('span', { class: 'chips' }, v.buried.map((c) => chipEl(c, v.trump)))));
+      }
     } else {
-      myRow.append(h('span', { class: 'hint' }, '观战中'));
+      meStatus.append(h('span', { class: 'hint' }, '观战中'));
     }
-    felt.append(myRow);
 
-    const handArea = h('div', { class: 'hand-area' });
     const actions = h('div', { class: 'actions' });
+    const controlBar = h('div', { class: 'control-bar' }, meStatus, actions);
     const hand = h('div', { class: 'hand' });
-    handArea.append(actions, hand);
+    const handArea = h('div', { class: 'hand-area' }, controlBar, hand);
     felt.append(handArea);
 
     const main = h('div', { class: 'main-area' }, felt);
-    if (st.panel) main.append(sidePanel());
+    if (st.panel) {
+      main.append(h('div', { class: 'side-backdrop', onclick: () => togglePanel(st.panel) }));
+      main.append(sidePanel());
+    }
     wrap.append(main);
     app.append(wrap);
 
-    // fill trick slots (needs layout)
+    // fill trick slots & hand (after DOM mount so clientWidth is exact)
     fillTrick(slots);
     renderActions(actions);
     if (v.hand) {
@@ -320,22 +389,22 @@ export function mountPlay(app) {
     }
     if (v.phase === 'bid') {
       mid.append(h('div', { class: 'big' }, v.best_bid ? `当前 ${v.best_bid} 分` : '叫分'));
-      mid.append(h('div', {}, `${seatName(v.to_act)} 叫分中`));
+      mid.append(h('div', { class: 'mid-sub' }, `${seatName(v.to_act)} 叫分中`));
     } else if (v.phase === 'trump') {
-      mid.append(h('div', { class: 'big' }, `庄分 ${v.contract}`), h('div', {}, `${seatName(v.banker)} 定主中`));
+      mid.append(h('div', { class: 'big' }, `庄分 ${v.contract}`), h('div', { class: 'mid-sub' }, `${seatName(v.banker)} 定主中`));
     } else if (v.phase === 'bury') {
-      mid.append(h('div', { class: 'big' }, v.trump_label), h('div', {}, `${seatName(v.banker)} 埋底中`));
+      mid.append(h('div', { class: 'big' }, v.trump_label), h('div', { class: 'mid-sub' }, `${seatName(v.banker)} 埋底中`));
     } else if (v.phase === 'play') {
       const n = (v.tricks || []).length + (v.cur.length ? 1 : 0);
       const pts = v.cur.reduce((a, p) => a + p.cards.reduce((b, c) => b + cardPts(c), 0), 0);
       mid.append(h('div', { class: 'big' }, `第 ${Math.max(1, n)} 轮`));
-      if (v.cur.length) mid.append(h('div', {}, `本轮 ${pts} 分`));
+      if (v.cur.length) mid.append(h('div', { class: 'mid-sub' }, `本轮 ${pts} 分`));
       else if (v.tricks.length) {
         const t = v.tricks[v.tricks.length - 1];
-        mid.append(h('div', {}, `${seatName(t.winner)} 赢 ${t.points} 分`));
+        mid.append(h('div', { class: 'mid-sub' }, `${seatName(t.winner)} 赢 ${t.points} 分`));
       }
     } else if (v.phase === 'over' && v.result) {
-      mid.append(h('div', { class: 'big' }, v.result.tier), h('div', {}, `闲家 ${v.result.xian_points} / ${v.result.contract}`));
+      mid.append(h('div', { class: 'big' }, v.result.tier), h('div', { class: 'mid-sub' }, `闲家 ${v.result.xian_points} / ${v.result.contract}`));
     }
     return mid;
   }
@@ -360,9 +429,6 @@ export function mountPlay(app) {
       st.seenPlays.add(key);
       fitStack(slots[r], p.cards, v.trump, (done ? 'done-trick ' : '') + (winner === p.seat ? 'win' : ''), anim);
     }
-    if (!done && v.cur.length) {
-      // highlight current winner is server-side unknown here; show nothing extra
-    }
   }
 
   function selectedCodes() {
@@ -371,18 +437,23 @@ export function mountPlay(app) {
 
   function updateSelInfo() {
     const el = $('[data-selinfo]');
-    if (el) el.textContent = `已选 ${st.sel.size} 张`;
+    if (!el) return;
+    const v = st.view;
+    if (v && v.phase === 'bury') el.textContent = `已选 ${st.sel.size}/${v.bury_need}`;
+    else el.textContent = `已选 ${st.sel.size} 张`;
   }
 
   function renderActions(box) {
     const v = st.view;
     const mine = v.my_seat !== null && v.my_seat !== undefined && v.to_act === v.my_seat;
+    const compact = (window.innerHeight || 768) <= 540 && (window.innerWidth || 1024) > (window.innerHeight || 768);
     if (!v.phase) return;
     if (v.phase === 'over') {
       box.append(h('span', { class: 'msg' }, `${v.result.tier} · 闲家 ${v.result.xian_points} 分`),
-        h('button', { class: 'btn', onclick: showResult }, '查看结算'));
-      if (v.my_seat !== null && v.my_seat !== undefined) box.append(h('button', { class: 'btn primary', onclick: () => send({ op: 'next_hand' }) }, '下一局'));
-      else if (v.is_host) box.append(h('button', { class: 'btn primary', onclick: () => send({ op: 'next_hand' }) }, '下一局'));
+        h('button', { class: 'btn', onclick: showResult }, '结算详情'));
+      if ((v.my_seat !== null && v.my_seat !== undefined) || v.is_host) {
+        box.append(h('button', { class: 'btn primary', onclick: () => send({ op: 'next_hand' }) }, '下一局'));
+      }
       return;
     }
     if (!mine) {
@@ -392,12 +463,12 @@ export function mountPlay(app) {
     if (v.phase === 'bid') {
       const grid = h('div', { class: 'bid-grid' });
       for (const b of v.legal_bids || []) {
-        grid.append(h('button', { class: 'btn' + (b === 0 ? '' : ''), onclick: () => send({ op: 'action', kind: 'bid', value: b }) }, b === 0 ? '不叫' : `${b}`));
+        grid.append(h('button', { class: 'btn' + (b === 0 ? ' ghost' : ''), onclick: () => send({ op: 'action', kind: 'bid', value: b }) }, b === 0 ? '不叫' : `${b}`));
       }
-      box.append(h('span', { class: 'msg' }, '请叫分（越低越难）：'), grid);
+      box.append(h('span', { class: 'msg' }, compact ? '叫分:' : '请叫分（越低越难）：'), grid);
       if (v.mode === 'teach') box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'hint' }) }, '提示'));
     } else if (v.phase === 'trump') {
-      box.append(h('span', { class: 'msg' }, '底牌：'), h('span', { class: 'chips' }, (v.bottom || []).map((c) => chipEl(c, null))));
+      box.append(h('span', { class: 'msg' }, '底牌:'), h('span', { class: 'chips' }, (v.bottom || []).map((c) => chipEl(c, null))));
       for (const t of v.legal_trumps || []) {
         box.append(h('button', { class: 'btn' + (t === 5 ? ' danger' : ''), onclick: () => {
           if (t === 5 && !confirm(`确定投降？庄分 ${v.contract}，投降按${v.contract >= 55 ? '下庄' : '小倒'}结算。`)) return;
@@ -406,31 +477,36 @@ export function mountPlay(app) {
       }
       if (v.mode === 'teach') box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'hint' }) }, '提示'));
     } else if (v.phase === 'bury') {
-      box.append(h('span', { class: 'msg' }, `请选择 ${v.bury_need} 张牌埋底`), h('span', { class: 'hint', 'data-selinfo': 1 }, `已选 ${st.sel.size} 张`),
+      box.append(
+        h('span', { class: 'msg' }, compact ? '选牌埋底' : `请选择 ${v.bury_need} 张牌埋底`),
+        h('span', { class: 'hint', 'data-selinfo': 1 }, `已选 ${st.sel.size}/${v.bury_need}`),
         h('button', { class: 'btn primary', onclick: () => {
           const cards = selectedCodes();
           if (cards.length !== v.bury_need) { toast(`请选择 ${v.bury_need} 张牌`); return; }
           send({ op: 'action', kind: 'bury', cards });
         } }, '埋底'),
-        h('button', { class: 'btn', onclick: () => { st.sel.clear(); render(); } }, '重选'));
+        h('button', { class: 'btn', onclick: () => { st.sel.clear(); render(); } }, '重选')
+      );
       if (v.mode === 'teach') box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'hint' }) }, '提示'));
     } else if (v.phase === 'play') {
       let need = '';
-      if (v.lead) need = `需跟 ${v.lead.n} 张（${KIND_NAMES[v.lead.kind]}）`;
-      else need = '你首出：单张 / 对子 / 拖拉机（主牌可甩）';
-      box.append(h('span', { class: 'msg' }, need), h('span', { class: 'hint', 'data-selinfo': 1 }, `已选 ${st.sel.size} 张`),
+      if (v.lead) need = compact ? `跟${v.lead.n}张(${KIND_NAMES[v.lead.kind]})` : `需跟 ${v.lead.n} 张（${KIND_NAMES[v.lead.kind]}）`;
+      else need = compact ? '你首出（主牌可甩）' : '你首出：单张 / 对子 / 拖拉机（主牌可甩）';
+      box.append(
+        h('span', { class: 'msg' }, need),
+        h('span', { class: 'hint', 'data-selinfo': 1 }, `已选 ${st.sel.size} 张`),
         h('button', { class: 'btn primary', onclick: () => {
           const cards = selectedCodes();
           if (!cards.length) { toast('请先选择要出的牌'); return; }
           send({ op: 'action', kind: 'play', cards });
         } }, '出牌'),
-        h('button', { class: 'btn', onclick: () => { st.sel.clear(); render(); } }, '重选'));
+        h('button', { class: 'btn', onclick: () => { st.sel.clear(); render(); } }, '重选')
+      );
       if (v.mode === 'teach') box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'hint' }) }, '提示'));
     }
   }
 
   function selectCodes(codes) {
-    // map suggested codes onto hand keys
     st.sel.clear();
     const hand = st.view.hand || [];
     const used = new Set();
@@ -595,7 +671,7 @@ export function mountPlay(app) {
         h('b', { class: r.scores[i] >= 0 ? 'pos' : 'neg' }, `${r.scores[i] >= 0 ? '+' : ''}${r.scores[i]}`),
         h('span', { class: 'hint' }, `累计 ${v.totals[i]}`)))),
       v.buried ? h('div', {}, h('div', { class: 'hint' }, '底牌'), h('div', { class: 'chips' }, v.buried.map((c) => chipEl(c, v.trump)))) : null);
-    const m = modal(h('div', {}, content, h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '14px' } },
+    const m = modal(h('div', {}, content, h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '10px' } },
       h('button', { class: 'btn', onclick: () => m.close() }, '关闭'),
       (my !== null && my !== undefined) || v.is_host ? h('button', { class: 'btn primary', onclick: () => { m.close(); send({ op: 'next_hand' }); } }, '下一局') : null)));
   }
@@ -618,6 +694,7 @@ export function mountPlay(app) {
 
   render();
   return () => {
+    window.__sdhPlayBack = null;
     offs.forEach((f) => f());
     clearInterval(timerInt);
     window.removeEventListener('resize', onResize);

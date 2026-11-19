@@ -3,11 +3,18 @@ package com.sandaha.zero;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.res.AssetManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.DisplayCutout;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -29,25 +36,36 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
     private WebView webView;
     private LinearLayout loadingOverlay;
     private long lastBackPress = 0;
+    private int safeL = 0, safeT = 0, safeR = 0, safeB = 0;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setStatusBarColor(Color.parseColor("#0b241b"));
-        getWindow().setNavigationBarColor(Color.parseColor("#0b241b"));
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().setStatusBarColor(Color.parseColor("#0a1913"));
+        getWindow().setNavigationBarColor(Color.parseColor("#0a1913"));
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(lp);
+        }
+        applyImmersiveFullscreen();
 
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.parseColor("#0b241b"));
+        root.setBackgroundColor(Color.parseColor("#0b1f18"));
 
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.parseColor("#0b241b"));
+        webView.setBackgroundColor(Color.parseColor("#0b1f18"));
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         WebSettings ws = webView.getSettings();
         ws.setJavaScriptEnabled(true);
         ws.setDomStorageEnabled(true);
@@ -56,22 +74,48 @@ public class MainActivity extends Activity {
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setUseWideViewPort(true);
         ws.setLoadWithOverviewMode(true);
+        ws.setSupportZoom(false);
+        ws.setBuiltInZoomControls(false);
+        ws.setDisplayZoomControls(false);
         ws.setTextZoom(100);
 
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
+                pushSafeInsetsToWeb();
                 if (loadingOverlay != null) {
-                    loadingOverlay.setVisibility( android.view.View.GONE );
+                    loadingOverlay.setVisibility(View.GONE);
                 }
             }
+        });
+
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            float density = Math.max(1f, getResources().getDisplayMetrics().density);
+            int l = 0, t = 0, r = 0, b = 0;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                DisplayCutout cutout = insets.getDisplayCutout();
+                if (cutout != null) {
+                    l = Math.round(cutout.getSafeInsetLeft() / density);
+                    t = Math.round(cutout.getSafeInsetTop() / density);
+                    r = Math.round(cutout.getSafeInsetRight() / density);
+                    b = Math.round(cutout.getSafeInsetBottom() / density);
+                }
+            }
+            if (l != safeL || t != safeT || r != safeR || b != safeB) {
+                safeL = l;
+                safeT = t;
+                safeR = r;
+                safeB = b;
+                pushSafeInsetsToWeb();
+            }
+            return insets;
         });
 
         loadingOverlay = new LinearLayout(this);
         loadingOverlay.setOrientation(LinearLayout.VERTICAL);
         loadingOverlay.setGravity(Gravity.CENTER);
-        loadingOverlay.setBackgroundColor(Color.parseColor("#0b241b"));
+        loadingOverlay.setBackgroundColor(Color.parseColor("#0b1f18"));
 
         ProgressBar spinner = new ProgressBar(this);
         TextView title = new TextView(this);
@@ -79,7 +123,7 @@ public class MainActivity extends Activity {
         title.setTextColor(Color.parseColor("#e3b341"));
         title.setTextSize(20f);
         title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 36, 0, 12);
+        title.setPadding(0, 32, 0, 10);
 
         TextView subtitle = new TextView(this);
         subtitle.setText("正在启动本地 AI 引擎…");
@@ -118,6 +162,56 @@ public class MainActivity extends Activity {
                 });
             }
         }, "sandaha-boot").start();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applyImmersiveFullscreen() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            WindowInsetsController ctrl = getWindow().getInsetsController();
+            if (ctrl != null) {
+                ctrl.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                ctrl.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            }
+        } else {
+            View decor = getWindow().getDecorView();
+            decor.setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_FULLSCREEN
+            );
+        }
+    }
+
+    private void pushSafeInsetsToWeb() {
+        if (webView == null) return;
+        final String js = String.format(Locale.US,
+                "(function(){var s=document.documentElement.style;" +
+                "s.setProperty('--safe-l','%dpx');s.setProperty('--safe-t','%dpx');" +
+                "s.setProperty('--safe-r','%dpx');s.setProperty('--safe-b','%dpx');" +
+                "window.dispatchEvent(new Event('resize'));})();",
+                safeL, safeT, safeR, safeB);
+        webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            applyImmersiveFullscreen();
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        applyImmersiveFullscreen();
+        if (webView != null) {
+            webView.postDelayed(this::pushSafeInsetsToWeb, 120);
+        }
     }
 
     private void syncAssetsIfNeeded(AssetManager am, File destRoot) throws IOException {
@@ -186,22 +280,20 @@ public class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
         if (webView != null) {
-            String url = webView.getUrl();
-            if (url != null && (url.contains("#/play") || url.contains("#/train"))) {
-                webView.evaluateJavascript("location.hash = '#/';", null);
-                return;
-            }
-            if (webView.canGoBack()) {
-                webView.goBack();
-                return;
-            }
+            webView.evaluateJavascript("(window.__sdhBack ? window.__sdhBack() : false)", value -> {
+                if ("true".equals(value)) {
+                    return;
+                }
+                long now = System.currentTimeMillis();
+                if (now - lastBackPress > 2000) {
+                    lastBackPress = now;
+                    Toast.makeText(MainActivity.this, "再按一次退出三打哈 AI", Toast.LENGTH_SHORT).show();
+                } else {
+                    MainActivity.super.onBackPressed();
+                }
+            });
+            return;
         }
-        long now = System.currentTimeMillis();
-        if (now - lastBackPress > 2000) {
-            lastBackPress = now;
-            Toast.makeText(this, "再按一次退出三打哈 AI", Toast.LENGTH_SHORT).show();
-        } else {
-            super.onBackPressed();
-        }
+        super.onBackPressed();
     }
 }

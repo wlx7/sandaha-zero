@@ -26,6 +26,15 @@ _cache: dict[str, Model] = {}
 _lock = threading.Lock()
 
 
+def is_standalone() -> bool:
+    """Return True when running inside standalone Windows EXE or Android APK (training disabled)."""
+    return bool(
+        getattr(sys, "frozen", False)
+        or os.environ.get("SANDAHA_MOBILE") == "1"
+        or os.environ.get("SANDAHA_NO_TRAIN") == "1"
+    )
+
+
 def set_root(root_dir: str):
     """Override ROOT / MODELS_DIR / RUNS_DIR (used by embedded Android runtime)."""
     global ROOT, MODELS_DIR, RUNS_DIR

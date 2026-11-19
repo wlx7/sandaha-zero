@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from .. import __version__
 from ..engine import IllegalMove
 from ..rules import Rules
-from . import registry, training
+from . import registry
 from .rooms import BATTLE, TEACH, Room
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
@@ -125,9 +125,22 @@ async def favicon():
 @app.get("/api/info")
 async def info():
     port = int(os.environ.get("SANDAHA_PORT", "8765"))
-    return {"version": __version__, "lan": [f"http://{ip}:{port}" for ip in lan_addresses()],
-            "port": port, "default_model": registry.default_model_path(),
-            "rules": Rules().to_dict(), "torch": training.torch_info()}
+    standalone = registry.is_standalone()
+    torch_st = {"available": False}
+    if not standalone:
+        from . import training
+        torch_st = training.torch_info()
+    return {
+        "version": __version__,
+        "lan": [f"http://{ip}:{port}" for ip in lan_addresses()],
+        "port": port,
+        "default_model": registry.default_model_path(),
+        "rules": Rules().to_dict(),
+        "standalone": standalone,
+        "mobile": os.environ.get("SANDAHA_MOBILE") == "1",
+        "can_train": not standalone,
+        "torch": torch_st,
+    }
 
 
 @app.get("/api/models")
@@ -146,6 +159,13 @@ async def qr(url: str):
 
 # ---------------------------------------------------------------- training --
 
+def _require_train():
+    if registry.is_standalone():
+        raise HTTPException(404, "独立客户端已移除训练模块")
+    from . import training
+    return training
+
+
 def _wrap(fn, *a):
     try:
         return fn(*a)
@@ -155,6 +175,7 @@ def _wrap(fn, *a):
 
 @app.get("/api/train/presets")
 async def train_presets():
+    training = _require_train()
     from ..train.config import TrainConfig
     return {"presets": training.presets(), "defaults": TrainConfig().__dict__,
             "torch": training.torch_info(), "cpus": os.cpu_count()}
@@ -162,46 +183,55 @@ async def train_presets():
 
 @app.get("/api/train/runs")
 async def train_runs():
+    training = _require_train()
     return {"runs": training.list_runs()}
 
 
 @app.get("/api/train/run/{name}")
 async def train_run(name: str):
+    training = _require_train()
     return _wrap(training.run_detail, name)
 
 
 @app.post("/api/train/start")
 async def train_start(cfg: dict = Body(...)):
+    training = _require_train()
     return _wrap(training.start, cfg)
 
 
 @app.post("/api/train/stop/{name}")
 async def train_stop(name: str):
+    training = _require_train()
     return _wrap(training.stop, name)
 
 
 @app.post("/api/train/delete/{name}")
 async def train_delete(name: str):
+    training = _require_train()
     return _wrap(training.delete, name)
 
 
 @app.post("/api/train/publish/{name}")
 async def train_publish(name: str, body: dict = Body(...)):
+    training = _require_train()
     return _wrap(training.publish, name, body.get("source"), body.get("target"))
 
 
 @app.post("/api/train/install")
 async def train_install():
+    training = _require_train()
     return training.install_torch()
 
 
 @app.get("/api/train/install")
 async def train_install_status():
+    training = _require_train()
     return training.install_status()
 
 
 @app.post("/api/eval")
 async def quick_eval(body: dict = Body(...)):
+    training = _require_train()
     a, b = body.get("a"), body.get("b")
     deals = min(500, int(body.get("deals", 100)))
     try:

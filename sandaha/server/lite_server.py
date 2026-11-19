@@ -23,7 +23,7 @@ import uuid
 from .. import __version__
 from ..engine import IllegalMove
 from ..rules import Rules
-from . import registry, training
+from . import registry
 from .rooms import BATTLE, TEACH, Room
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
@@ -473,14 +473,22 @@ async def _handle_conn(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
 
         # REST API
         port = int(os.environ.get("SANDAHA_PORT", "8765"))
+        standalone = registry.is_standalone()
         if method == "GET" and path == "/api/info":
+            torch_st = {"available": False}
+            if not standalone:
+                from . import training
+                torch_st = training.torch_info()
             _json_response(writer, 200, {
                 "version": __version__,
                 "lan": [f"http://{ip}:{port}" for ip in lan_addresses()],
                 "port": port,
                 "default_model": registry.default_model_path(),
                 "rules": Rules().to_dict(),
-                "torch": training.torch_info(),
+                "standalone": standalone,
+                "mobile": os.environ.get("SANDAHA_MOBILE") == "1",
+                "can_train": not standalone,
+                "torch": torch_st,
             })
         elif method == "GET" and path == "/api/models":
             _json_response(writer, 200, {
@@ -496,7 +504,10 @@ async def _handle_conn(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 _http_response(writer, 200, "image/svg+xml", buf.getvalue())
             except Exception:
                 _http_response(writer, 200, "image/svg+xml", b"<svg xmlns='http://www.w3.org/2000/svg'/>")
+        elif standalone and (path.startswith("/api/train") or path == "/api/eval"):
+            _json_response(writer, 404, {"detail": "独立客户端已移除训练模块"})
         elif method == "GET" and path == "/api/train/presets":
+            from . import training
             from ..train.config import TrainConfig
             _json_response(writer, 200, {
                 "presets": training.presets(),
@@ -505,24 +516,26 @@ async def _handle_conn(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 "cpus": os.cpu_count(),
             })
         elif method == "GET" and path == "/api/train/runs":
+            from . import training
             _json_response(writer, 200, {"runs": training.list_runs()})
         elif method == "GET" and path.startswith("/api/train/run/"):
+            from . import training
             name = urllib.parse.unquote(path[len("/api/train/run/"):])
             _json_response(writer, 200, training.run_detail(name))
         elif method == "GET" and path == "/api/train/install":
+            from . import training
             _json_response(writer, 200, training.install_status())
         elif method == "POST" and path == "/api/eval":
+            from . import training
             payload = json.loads(body_bytes.decode("utf-8") or "{}")
             a, b = payload.get("a"), payload.get("b")
             deals = min(500, int(payload.get("deals", 100)))
             res = await asyncio.to_thread(training.quick_eval, a, b, deals)
             _json_response(writer, 200, res)
         elif method == "POST" and path == "/api/train/start":
-            if os.environ.get("SANDAHA_MOBILE") == "1":
-                _json_response(writer, 400, {"detail": "移动端内置完整对弈与教学AI，自对弈训练请在电脑或云端运行"})
-            else:
-                payload = json.loads(body_bytes.decode("utf-8") or "{}")
-                _json_response(writer, 200, training.start(payload))
+            from . import training
+            payload = json.loads(body_bytes.decode("utf-8") or "{}")
+            _json_response(writer, 200, training.start(payload))
         else:
             _json_response(writer, 404, {"detail": "Not Found"})
     except (ValueError, FileNotFoundError) as e:

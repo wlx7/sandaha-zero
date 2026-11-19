@@ -80,7 +80,12 @@ def main():
         add_data += ["--add-data", f"{lite_model}{sep}models"]
 
     excludes = []
-    for mod in ("torch", "torchvision", "torchaudio", "triton", "pytest", "scipy", "matplotlib", "pandas"):
+    for mod in (
+        "sandaha.train",
+        "sandaha.server.training",
+        "torch", "torchvision", "torchaudio", "triton",
+        "pytest", "scipy", "matplotlib", "pandas",
+    ):
         excludes += ["--exclude-module", mod]
 
     hidden = []

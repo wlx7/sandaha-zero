@@ -4,6 +4,7 @@ import json
 import os
 import socket
 import struct
+import urllib.error
 import urllib.request
 
 from sandaha.server.lite_server import start_android_server
@@ -54,6 +55,13 @@ def test_lite_server_http_and_websocket():
     with opener.open(base + "/api/info") as r:
         info = json.loads(r.read().decode("utf-8"))
         assert "version" in info and "rules" in info
+        assert info["can_train"] is False and info["standalone"] is True
+
+    try:
+        opener.open(base + "/api/train/runs")
+        raise AssertionError("Expected 404 for /api/train/runs on mobile")
+    except urllib.error.HTTPError as e:
+        assert e.code == 404
 
     with opener.open(base + "/api/models") as r:
         mods = json.loads(r.read().decode("utf-8"))
