@@ -496,7 +496,8 @@ export function mountPlay(app) {
         },
       }, 'AI手牌'));
     }
-    tools.append(fullscreenBtn(() => render()));
+    const fsBtn = fullscreenBtn(() => render());
+    if (fsBtn) tools.append(fsBtn);
     tools.append(h('button', { class: 'btn sm ghost', onclick: showRules }, '规则'));
     if (v.can_manage || v.is_host) {
       tools.append(h('button', { class: 'btn sm', onclick: showManageModal }, '管理'));

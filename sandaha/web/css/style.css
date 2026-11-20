@@ -255,10 +255,11 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
     "pleft pme  pright";
   gap: 4px 8px; align-items: center; min-height: 0; position: relative; }
 .pslot { width: 100%; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; padding: 1px; }
-.pslot.p-top { grid-area: ptop; align-self: end; }
-.pslot.p-left { grid-area: pleft; }
-.pslot.p-right { grid-area: pright; }
-.pslot.p-me { grid-area: pme; align-self: start; }
+/* Each player's cards sit close to that player instead of bunching in the middle */
+.pslot.p-top { grid-area: ptop; align-self: start; }
+.pslot.p-left { grid-area: pleft; justify-content: flex-start; padding-left: 4px; }
+.pslot.p-right { grid-area: pright; justify-content: flex-end; padding-right: 4px; }
+.pslot.p-me { grid-area: pme; align-self: end; }
 .mid { grid-area: mid; justify-self: center; display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; text-align: center; color: #dceee6; font-size: .84rem; padding: 4px 12px; border-radius: 12px;
   background: rgba(6, 22, 16, .38); border: 1px solid rgba(227, 179, 65, .2); max-width: 100%; min-width: 0; overflow: hidden; }
@@ -391,9 +392,9 @@ html.compact-landscape {
   --cw: clamp(44px, calc(var(--vw1) * 5.5), 52px);
   --ch: clamp(58px, calc(var(--vh1) * 16.2), 70px);
   --cfont: 14px;
-  --tcw: clamp(30px, calc(var(--vw1) * 3.8), 36px);
-  --tch: clamp(42px, calc(var(--vh1) * 11.4), 50px);
-  --tfont: 11.5px;
+  --tcw: clamp(32px, calc(var(--vh1) * 10.4), 40px);
+  --tch: clamp(44px, calc(var(--vh1) * 14.5), 56px);
+  --tfont: 12.5px;
   font-size: 13.5px;
 }
 
