@@ -22,3 +22,8 @@ android/app/build/
 android/local.properties
 *.jks
 *.keystore
+
+# Android release signing key (never commit)
+signing/
+*.jks
+*.p12

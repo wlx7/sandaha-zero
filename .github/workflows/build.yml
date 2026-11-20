@@ -29,14 +29,25 @@ jobs:
         with:
           gradle-version: "8.7"
 
+      - name: Restore release signing key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          test -n "$KS_B64" || { echo "::error::ANDROID_KEYSTORE_B64 secret is missing"; exit 1; }
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/sandaha-release.p12"
+          echo "SANDAHA_KEYSTORE=$RUNNER_TEMP/sandaha-release.p12" >> "$GITHUB_ENV"
+
       - name: Build Signed Release APK
+        env:
+          SANDAHA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           which python3.13 && python3.13 --version
           gradle -p android assembleRelease --no-daemon --stacktrace
           cp android/app/build/outputs/apk/release/app-release.apk SanDaHa-Zero-Android.apk
           ls -lh SanDaHa-Zero-Android.apk
           APKSIGNER=$(ls -1 "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
-          "$APKSIGNER" verify --verbose SanDaHa-Zero-Android.apk
+          "$APKSIGNER" verify --verbose --print-certs SanDaHa-Zero-Android.apk
+          rm -f "$SANDAHA_KEYSTORE"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4

@@ -7,6 +7,14 @@ def repoRoot = file("../..")
 def genPyDir = file("$buildDir/generated/python_src")
 def genAssetsDir = file("$buildDir/generated/assets_out")
 def autoKeystore = file("$buildDir/sandaha-release.jks")
+// Fixed release key (CI: decoded from the ANDROID_KEYSTORE_B64 secret). With it, every new APK
+// installs over the previous one. Without it, a throwaway local key is generated (dev builds only).
+def fixedKeystorePath = System.getenv("SANDAHA_KEYSTORE")
+def fixedKeystorePassword = System.getenv("SANDAHA_KEYSTORE_PASSWORD")
+def useFixedKeystore = fixedKeystorePath && fixedKeystorePassword && file(fixedKeystorePath).exists()
+if (!useFixedKeystore && System.getenv("CI")) {
+    throw new GradleException("CI build without the fixed signing key: set the ANDROID_KEYSTORE_B64 / ANDROID_KEYSTORE_PASSWORD secrets")
+}
 
 tasks.register("syncSandahaAssets") {
     doLast {
@@ -37,7 +45,7 @@ tasks.register("syncSandahaAssets") {
 
 tasks.register("ensureReleaseKeystore") {
     doLast {
-        if (!autoKeystore.exists()) {
+        if (!useFixedKeystore && !autoKeystore.exists()) {
             autoKeystore.parentFile.mkdirs()
             def javaHome = System.getProperty("java.home")
             def keytoolBin = new File(javaHome, "bin/keytool" + (System.getProperty("os.name").toLowerCase().contains("win") ? ".exe" : ""))
@@ -83,10 +91,18 @@ android {
 
     signingConfigs {
         release {
-            storeFile autoKeystore
-            storePassword "sandaha2026"
-            keyAlias "sandaha"
-            keyPassword "sandaha2026"
+            if (useFixedKeystore) {
+                storeFile file(fixedKeystorePath)
+                storeType "pkcs12"
+                storePassword fixedKeystorePassword
+                keyAlias "sandaha"
+                keyPassword fixedKeystorePassword
+            } else {
+                storeFile autoKeystore
+                storePassword "sandaha2026"
+                keyAlias "sandaha"
+                keyPassword "sandaha2026"
+            }
             v1SigningEnabled true
             v2SigningEnabled true
         }
