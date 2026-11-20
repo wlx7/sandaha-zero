@@ -227,7 +227,7 @@ export function mountPlay(app) {
     const opts = [];
     for (const m of st.models.filter((x) => x.kind !== 'checkpoint')) {
       opts.push(h('option', { value: m.path }, fmtLabel(m)));
-      opts.push(h('option', { value: m.path + '?search' }, `${m.label} + 搜索增强`));
+      opts.push(h('option', { value: m.path + '?search' }, `${m.label} + 搜索（较慢）`));
     }
     opts.push(h('option', { value: 'rule' }, '规则AI (基准)'), h('option', { value: 'random' }, '随机AI'));
     const ck = st.models.filter((x) => x.kind === 'checkpoint').slice(-12);

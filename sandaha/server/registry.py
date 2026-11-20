@@ -120,6 +120,15 @@ def default_model_path():
     return None
 
 
+def default_agent_spec():
+    """Default AI opponent.
+
+    Plain network: search-enhanced play was measured at 49.9% / -0.02~-0.04 stakes per game
+    against the plain network over 800-1,600 duplicate games (no gain) while being far slower.
+    """
+    return default_model_path()
+
+
 def load_model(path) -> Model:
     path = path[:-7] if path.endswith("?search") else path
     full = _resolve_model_file(path)
@@ -143,7 +152,10 @@ def make_agent(spec: str, seed=None):
     try:
         if spec.endswith("?search"):
             from ..ai.search import SearchAgent
-            return SearchAgent(load_model(spec[:-7]), seed=seed)
+            mobile = os.environ.get("SANDAHA_MOBILE") == "1"
+            # Interactive play: search the mid/endgame under a strict per-move time budget
+            return SearchAgent(load_model(spec[:-7]), seed=seed,
+                               time_budget=0.8 if mobile else 0.6, max_hand=8 if mobile else 10)
         return AIAgent(load_model(spec), seed=seed)
     except (FileNotFoundError, ValueError, OSError):
         fallback = default_model_path()

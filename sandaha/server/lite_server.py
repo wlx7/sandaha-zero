@@ -237,7 +237,7 @@ async def handle(client: Client, msg: dict):
                 if i == mine:
                     specs[i] = {"kind": "human", "client_id": client.id}
                 elif specs[i].get("kind") != "ai":
-                    specs[i] = {"kind": "ai", "model": msg.get("coach") or registry.default_model_path() or "rule"}
+                    specs[i] = {"kind": "ai", "model": msg.get("coach") or registry.default_agent_spec() or "rule"}
         room = Room(
             hub, client.id, msg.get("name"), mode, specs, msg.get("rules"), msg.get("coach"),
             msg.get("ai_delay", 0.9), msg.get("turn_seconds", 30) if mode == BATTLE else 0
@@ -525,7 +525,7 @@ async def _handle_conn(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
         elif method == "GET" and path == "/api/models":
             _json_response(writer, 200, {
                 "models": registry.list_models(),
-                "default": registry.default_model_path(),
+                "default": registry.default_agent_spec(),
             })
         elif method == "GET" and path == "/api/qr":
             url = query.get("url", "")

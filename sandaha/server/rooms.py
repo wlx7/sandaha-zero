@@ -81,7 +81,7 @@ class Room:
         seat = self.seats[i]
         if kind == "ai":
             seat.kind, seat.client_id = "ai", None
-            seat.agent_spec = spec.get("model") or registry.default_model_path() or "rule"
+            seat.agent_spec = spec.get("model") or registry.default_agent_spec() or "rule"
             seat.name = f"{registry.agent_label(seat.agent_spec)}·{i + 1}"
             seat.agent = registry.make_agent(seat.agent_spec, seed=random.randrange(1 << 30))
         elif kind == "human" and spec.get("client_id"):

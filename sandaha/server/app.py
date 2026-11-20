@@ -145,7 +145,7 @@ async def info():
 
 @app.get("/api/models")
 async def models():
-    return {"models": registry.list_models(), "default": registry.default_model_path()}
+    return {"models": registry.list_models(), "default": registry.default_agent_spec()}
 
 
 @app.get("/api/qr")
@@ -329,7 +329,7 @@ async def handle(client: Client, msg: dict):
                 if i == mine:
                     specs[i] = {"kind": "human", "client_id": client.id}
                 elif specs[i].get("kind") != "ai":
-                    specs[i] = {"kind": "ai", "model": msg.get("coach") or registry.default_model_path() or "rule"}
+                    specs[i] = {"kind": "ai", "model": msg.get("coach") or registry.default_agent_spec() or "rule"}
         room = Room(hub, client.id, msg.get("name"), mode, specs, msg.get("rules"), msg.get("coach"),
                     msg.get("ai_delay", 0.9), msg.get("turn_seconds", 30) if mode == BATTLE else 0)
         hub.rooms[room.id] = room

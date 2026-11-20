@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import random
+import time
 
 import numpy as np
 
@@ -206,17 +207,25 @@ def rollout_batch(worlds: list, model):
 
 
 class SearchAgent(AIAgent):
-    def __init__(self, model, samples=16, topk=4, gap=0.22, seed=None, name=None, max_rollouts=80):
+    def __init__(self, model, samples=16, topk=4, gap=0.22, seed=None, name=None, max_rollouts=80,
+                 time_budget=None, max_hand=None):
         super().__init__(model, 0.0, seed, name or f"{model.name}+search")
         self.samples = samples
         self.topk = topk
         self.gap = gap
         self.max_rollouts = max_rollouts
+        # Wall-clock budget per decision (seconds); None = unlimited (offline evaluation)
+        self.time_budget = time_budget
+        # Only search PLAY decisions once the searcher holds <= max_hand cards (None = always)
+        self.max_hand = max_hand
         self.last_search = None
 
     def act(self, g):
         if g.phase not in (PLAY, TRUMP):
             return super().act(g)
+        if self.max_hand is not None and g.hand_size(g.to_act) > self.max_hand:
+            return super().act(g)
+        t_start = time.perf_counter()
         acts, phase, st, A, out = self._scores(g)
         if len(acts) == 1:
             return acts[0]
@@ -248,30 +257,34 @@ class SearchAgent(AIAgent):
                 cand.append(int(idx))
 
         n = max(4, min(target_samples, rollout_cap // len(cand)))
-        sampled_deals = []
-        for k in range(n):
-            hands = sample_world(g, s, self.rng)
-            if hands is not None:
-                sampled_deals.append((hands, self.rng.randrange(1 << 30)))
-        if not sampled_deals:
-            return acts[int(order[0])]
-
-        worlds = []
-        world_meta = []
-        for hands, wseed in sampled_deals:
-            for j, ci in enumerate(cand):
-                w = make_world(g, s, hands, seed=wseed)
-                w.step(acts[ci])
-                worlds.append(w)
-                world_meta.append(j)
-
-        rollout_batch(worlds, self.model)
-
         totals = np.zeros(len(cand), dtype=np.float64)
         counts = np.zeros(len(cand), dtype=np.int32)
-        for w, j in zip(worlds, world_meta):
-            totals[j] += w.result["scores"][s]
-            counts[j] += 1
+        chunk = 4 if self.time_budget is not None else n
+        done = 0
+        while done < n:
+            k_now = min(chunk, n - done)
+            done += k_now
+            sampled_deals = []
+            for _ in range(k_now):
+                hands = sample_world(g, s, self.rng)
+                if hands is not None:
+                    sampled_deals.append((hands, self.rng.randrange(1 << 30)))
+            if not sampled_deals:
+                continue
+            worlds = []
+            world_meta = []
+            for hands, wseed in sampled_deals:
+                for j, ci in enumerate(cand):
+                    w = make_world(g, s, hands, seed=wseed)
+                    w.step(acts[ci])
+                    worlds.append(w)
+                    world_meta.append(j)
+            rollout_batch(worlds, self.model)
+            for w, j in zip(worlds, world_meta):
+                totals[j] += w.result["scores"][s]
+                counts[j] += 1
+            if self.time_budget is not None and time.perf_counter() - t_start >= self.time_budget:
+                break
 
         if counts.min() == 0:
             return acts[int(order[0])]
