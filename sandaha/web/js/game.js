@@ -45,6 +45,8 @@ export function mountPlay(app) {
     st.view = m;
     const sig = (m.hand || []).join(',') + '|' + m.phase + '|' + (m.hand_no || 0);
     if (sig !== st.handSig) { st.sel.clear(); st.handSig = sig; }
+    // A new hand started (e.g. all-AI rooms continue on their own): drop the old settlement popup
+    if (st.resultModal && m.phase !== 'over') { st.resultModal.close(); st.resultModal = null; }
     render();
     if (m.phase === 'over' && m.result && st.shownResult !== m.hand_no) {
       st.shownResult = m.hand_no;
@@ -411,18 +413,22 @@ export function mountPlay(app) {
     slot.append(el);
     if (!codes || !codes.length) return el;
     // Measure untransformed layout box size (offsetWidth/Height stay unswapped under CSS rotate(90deg)!)
-    const probe = cardEl(codes[0], { trump, mini: true });
+    // Probe a trump card ("7" is always trump) so the index column includes the 主 mark.
+    const probe = cardEl('S7', { trump, mini: true });
     probe.style.position = 'absolute';
     probe.style.visibility = 'hidden';
     el.append(probe);
     const cw = probe.offsetWidth || 36;
     const ch = probe.offsetHeight || 50;
+    const idxEl = probe.querySelector('.idx');
+    const idxW = idxEl ? idxEl.offsetLeft + idxEl.offsetWidth : 16;
+    const idxBottom = idxEl ? idxEl.offsetTop + idxEl.offsetHeight : Math.round(ch * 0.7);
     probe.remove();
 
     const avail = Math.max(cw * 2, slot.clientWidth - 4);
     const n = codes.length;
-    // .card.mini .idx occupies left ~16px; keep >= 19px step so rank, suit & 主 are 100% uncovered
-    const minS = Math.max(19, Math.ceil(cw * 0.54));
+    // Horizontal step must clear the index column (rank, suit & 主) of the card underneath
+    const minS = Math.max(idxW + 2, 17);
     const maxS = Math.max(minS + 3, Math.round(cw * 0.70));
     let step = n > 1 ? Math.min(maxS, (avail - cw) / (n - 1)) : 0;
     let perRow = n;
@@ -432,7 +438,8 @@ export function mountPlay(app) {
     }
     el.style.flexDirection = 'column';
     el.style.alignItems = 'center';
-    const rowOverlap = Math.max(0, Math.min(Math.round(ch * 0.36), Math.round(ch - 32)));
+    // A wrapped second row may only cover the blank lower part of the row above, never its 主 mark
+    const rowOverlap = Math.max(0, ch - idxBottom - 3);
     for (let r = 0; r * perRow < n; r++) {
       const row = h('div', { style: { display: 'flex', marginTop: r ? `-${rowOverlap}px` : '0' } });
       codes.slice(r * perRow, (r + 1) * perRow).forEach((c, k) => {
@@ -497,12 +504,25 @@ export function mountPlay(app) {
       }, 'AI手牌'));
     }
     const fsBtn = fullscreenBtn(() => render());
-    if (fsBtn) tools.append(fsBtn);
-    tools.append(h('button', { class: 'btn sm ghost', onclick: showRules }, '规则'));
+    const extra = [];
+    if (fsBtn) extra.push(fsBtn);
+    extra.push(h('button', { class: 'btn sm ghost', onclick: showRules }, '规则'));
     if (v.can_manage || v.is_host) {
-      tools.append(h('button', { class: 'btn sm', onclick: showManageModal }, '管理'));
+      extra.push(h('button', { class: 'btn sm', onclick: showManageModal }, '管理'));
     }
-    tools.append(h('button', { class: 'btn sm ghost', onclick: promptLeaveRoom }, '离开'));
+    extra.push(h('button', { class: 'btn sm ghost', onclick: promptLeaveRoom }, '离开'));
+    if (stage.compact && tools.children.length + extra.length > 5) {
+      // Short landscape phones: keep the bar on one line so "离开" is never scrolled off-screen
+      tools.append(h('button', { class: 'btn sm', onclick: () => {
+        const close = () => m.close();
+        const items = extra.map((b) => { b.classList.remove('sm'); b.addEventListener('click', close); return b; });
+        const m = modal(h('div', {}, h('h2', {}, '更多'),
+          h('div', { class: 'manage-grid' }, items),
+          h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '10px' } }, h('button', { class: 'btn ghost', onclick: close }, '关闭'))));
+      } }, '更多'));
+    } else {
+      tools.append(...extra);
+    }
     wrap.append(h('div', { class: 'topbar' }, info, tools));
 
     // ---- felt
@@ -663,13 +683,26 @@ export function mountPlay(app) {
     }
     if (v.phase === 'bid') {
       const grid = h('div', { class: 'bid-grid' });
-      for (const b of v.legal_bids || []) {
+      // "不叫" first: on narrow screens the bar scrolls sideways and the pass button must never be off-screen
+      const bids = [...(v.legal_bids || [])].sort((a, b) => (a === 0 ? -1 : b === 0 ? 1 : b - a));
+      for (const b of bids) {
         grid.append(h('button', { class: 'btn' + (b === 0 ? ' ghost' : ''), onclick: () => send({ op: 'action', kind: 'bid', value: b }) }, b === 0 ? '不叫' : `${b}`));
       }
-      box.append(h('span', { class: 'msg' }, compact ? '叫分:' : '请叫分（越低越难）：'), grid);
+      box.append(h('span', { class: 'msg' }, compact ? '叫分:' : '请叫分（越低越难）：'));
       if (v.mode === 'teach') box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'hint' }) }, '提示'));
+      box.append(grid);
     } else if (v.phase === 'trump') {
-      box.append(h('span', { class: 'msg' }, '底牌:'), h('span', { class: 'chips' }, (v.bottom || []).map((c) => chipEl(c, null))));
+      if (compact) {
+        // Narrow phones: 8 bottom chips + 6 trump buttons do not fit on one line, so the chips move into a popup
+        box.append(h('button', { class: 'btn sm', onclick: () => {
+          const m = modal(h('div', {}, h('h2', {}, '底牌（已并入手牌）'),
+            h('div', { class: 'chips', style: { margin: '10px 0', justifyContent: 'center' } }, (v.bottom || []).map((c) => chipEl(c, null))),
+            h('div', { class: 'row', style: { justifyContent: 'flex-end' } }, h('button', { class: 'btn primary', onclick: () => m.close() }, '关闭'))));
+        } }, '看底牌'));
+      } else {
+        box.append(h('span', { class: 'msg' }, '底牌:'), h('span', { class: 'chips' }, (v.bottom || []).map((c) => chipEl(c, null))));
+      }
+      if (v.mode === 'teach') box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'hint' }) }, '提示'));
       for (const t of v.legal_trumps || []) {
         box.append(h('button', { class: 'btn' + (t === 5 ? ' danger' : ''), onclick: () => {
           if (t === 5) {
@@ -684,7 +717,6 @@ export function mountPlay(app) {
           send({ op: 'action', kind: 'trump', value: t });
         } }, TRUMP_NAMES[t]));
       }
-      if (v.mode === 'teach') box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'hint' }) }, '提示'));
     } else if (v.phase === 'bury') {
       box.append(
         h('span', { class: 'msg' }, compact ? '选牌埋底' : `请选择 ${v.bury_need} 张牌埋底`),
@@ -891,6 +923,8 @@ export function mountPlay(app) {
       } }, '结束牌局') : null,
       h('button', { class: 'btn', onclick: () => m.close() }, '关闭'),
       (my !== null && my !== undefined) || v.is_host || v.can_manage ? h('button', { class: 'btn primary', onclick: () => { m.close(); send({ op: 'next_hand' }); } }, '下一局') : null)));
+    if (st.resultModal) st.resultModal.close();
+    st.resultModal = m;
   }
 
   // ========================================================== timer =====

@@ -481,7 +481,9 @@ html.compact-landscape .center {
   gap: 2px 6px;
   grid-template-columns: minmax(0, 1fr) minmax(112px, 1.35fr) minmax(0, 1fr);
 }
-html.compact-landscape .mid { flex-direction: row; gap: 6px; padding: 2px 9px; border-radius: 99px; font-size: .75rem; }
+/* One line when it fits; on narrow phones wrap to two lines instead of cutting "当前 50 分" to "当前 5…" */
+html.compact-landscape .mid { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 0 6px; padding: 2px 9px; border-radius: 14px; font-size: .75rem; }
+html.compact-landscape .mid .big { overflow: visible; text-overflow: clip; }
 html.compact-landscape .mid .big { font-size: .86rem; }
 
 /* Single-line unified control bar above single-row hand */
