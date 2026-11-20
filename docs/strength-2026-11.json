@@ -1,0 +1,398 @@
+{
+ "date": "2026-11-20",
+ "model": "models/sandaha-best.npz (51.07M games)",
+ "profile": {
+  "selfplay": {
+   "hands": 20000,
+   "banker_win": 0.4244,
+   "banker_avg_score": 2.676,
+   "avg_contract": 64.18,
+   "all_pass": 0.0013,
+   "surrender": 0.1827,
+   "no_trump": 0.0016,
+   "koudi": 0.0532,
+   "tiers": {
+    "下庄": 5649,
+    "保庄": 3776,
+    "投降(下庄)": 3496,
+    "大光": 2949,
+    "小光": 1763,
+    "小倒": 1629,
+    "大倒": 579,
+    "投降(小倒)": 159
+   },
+   "by_contract": {
+    "80": {
+     "n": 1268,
+     "share": 0.0634,
+     "banker_win": 0.625,
+     "banker_avg": 4.879,
+     "pred_bid": 2.788,
+     "pred_trump": 4.816,
+     "xp": 53.3
+    },
+    "75": {
+     "n": 1166,
+     "share": 0.0583,
+     "banker_win": 0.323,
+     "banker_avg": 0.35,
+     "pred_bid": -0.577,
+     "pred_trump": 0.445,
+     "xp": 54.0
+    },
+    "70": {
+     "n": 8120,
+     "share": 0.406,
+     "banker_win": 0.477,
+     "banker_avg": 3.241,
+     "pred_bid": 2.52,
+     "pred_trump": 3.097,
+     "xp": 48.0
+    },
+    "65": {
+     "n": 620,
+     "share": 0.031,
+     "banker_win": 0.252,
+     "banker_avg": -0.024,
+     "pred_bid": -0.706,
+     "pred_trump": 0.077,
+     "xp": 38.2
+    },
+    "60": {
+     "n": 4952,
+     "share": 0.2476,
+     "banker_win": 0.381,
+     "banker_avg": 2.502,
+     "pred_bid": 1.859,
+     "pred_trump": 2.748,
+     "xp": 42.1
+    },
+    "55": {
+     "n": 1348,
+     "share": 0.0674,
+     "banker_win": 0.345,
+     "banker_avg": 2.001,
+     "pred_bid": 0.848,
+     "pred_trump": 2.144,
+     "xp": 39.1
+    },
+    "50": {
+     "n": 1585,
+     "share": 0.0793,
+     "banker_win": 0.385,
+     "banker_avg": 2.362,
+     "pred_bid": 1.735,
+     "pred_trump": 2.612,
+     "xp": 52.9
+    },
+    "45": {
+     "n": 434,
+     "share": 0.0217,
+     "banker_win": 0.364,
+     "banker_avg": 2.053,
+     "pred_bid": 1.341,
+     "pred_trump": 2.388,
+     "xp": 50.8
+    },
+    "40": {
+     "n": 197,
+     "share": 0.0098,
+     "banker_win": 0.371,
+     "banker_avg": 2.711,
+     "pred_bid": 1.481,
+     "pred_trump": 3.047,
+     "xp": 48.9
+    },
+    "35": {
+     "n": 98,
+     "share": 0.0049,
+     "banker_win": 0.276,
+     "banker_avg": 0.429,
+     "pred_bid": 0.207,
+     "pred_trump": 1.016,
+     "xp": 51.6
+    },
+    "30": {
+     "n": 122,
+     "share": 0.0061,
+     "banker_win": 0.344,
+     "banker_avg": 2.287,
+     "pred_bid": 1.685,
+     "pred_trump": 2.715,
+     "xp": 44.7
+    },
+    "25": {
+     "n": 7,
+     "share": 0.0003,
+     "banker_win": 0.286,
+     "banker_avg": 0.0,
+     "pred_bid": 0.306,
+     "pred_trump": 1.1,
+     "xp": 62.9
+    },
+    "20": {
+     "n": 25,
+     "share": 0.0013,
+     "banker_win": 0.32,
+     "banker_avg": 1.08,
+     "pred_bid": 0.491,
+     "pred_trump": 4.237,
+     "xp": 43.6
+    },
+    "15": {
+     "n": 4,
+     "share": 0.0002,
+     "banker_win": 0.25,
+     "banker_avg": 0.75,
+     "pred_bid": 1.831,
+     "pred_trump": 0.232,
+     "xp": 51.2
+    },
+    "10": {
+     "n": 3,
+     "share": 0.0001,
+     "banker_win": 0.0,
+     "banker_avg": -7.0,
+     "pred_bid": 1.033,
+     "pred_trump": -4.873,
+     "xp": 46.7
+    },
+    "5": {
+     "n": 51,
+     "share": 0.0026,
+     "banker_win": 0.275,
+     "banker_avg": 0.706,
+     "pred_bid": 1.758,
+     "pred_trump": 1.382,
+     "xp": 35.8
+    }
+   },
+   "calib_trump_pred_mean": 2.7348,
+   "calib_trump_real_mean": 2.676
+  },
+  "t_selfplay": 238.7,
+  "seat": [
+   {
+    "x": "models/sandaha-best.npz",
+    "y": "rule",
+    "games": 16000,
+    "avg_score": 1.3286,
+    "se": 0.0397,
+    "pos_rate": 0.7444,
+    "banker_rate": 0.1163,
+    "banker_win": 0.7022
+   },
+   {
+    "x": "rule",
+    "y": "models/sandaha-best.npz",
+    "games": 16000,
+    "avg_score": -2.7553,
+    "se": 0.0434,
+    "pos_rate": 0.3233,
+    "banker_rate": 0.4626,
+    "banker_win": 0.1336
+   },
+   {
+    "x": "models/sandaha-best.npz",
+    "y": "models/sandaha-lite.npz",
+    "games": 16000,
+    "avg_score": -0.0003,
+    "se": 0.0394,
+    "pos_rate": 0.5429,
+    "banker_rate": 0.2214,
+    "banker_win": 0.4344
+   },
+   {
+    "x": "models/sandaha-lite.npz",
+    "y": "models/sandaha-best.npz",
+    "games": 16000,
+    "avg_score": -0.0966,
+    "se": 0.0407,
+    "pos_rate": 0.5189,
+    "banker_rate": 0.2798,
+    "banker_win": 0.3969
+   },
+   {
+    "x": "models/sandaha-best.npz?search",
+    "y": "models/sandaha-best.npz",
+    "games": 960,
+    "avg_score": 0.0083,
+    "se": 0.1653,
+    "pos_rate": 0.5396,
+    "banker_rate": 0.25,
+    "banker_win": 0.4333
+   }
+  ],
+  "seconds": 972.8
+ },
+ "probes": {
+  "bid_0.3": {
+   "games": 16000,
+   "avg_score": -0.0856,
+   "se": 0.0425,
+   "sec": 227.1,
+   "roles": {
+    "banker": {
+     "n": 5367,
+     "avg": 1.797
+    },
+    "xian": {
+     "n": 10633,
+     "avg": -1.036
+    },
+    "banker0": {
+     "n": 4000,
+     "avg": 2.852
+    },
+    "xian0": {
+     "n": 12000,
+     "avg": -0.951
+    }
+   }
+  },
+  "bid_1.0": {
+   "games": 16000,
+   "avg_score": -0.3941,
+   "se": 0.0455,
+   "sec": 203.3,
+   "roles": {
+    "banker": {
+     "n": 9057,
+     "avg": 0.178
+    },
+    "xian": {
+     "n": 6943,
+     "avg": -1.141
+    },
+    "banker0": {
+     "n": 4000,
+     "avg": 2.852
+    },
+    "xian0": {
+     "n": 12000,
+     "avg": -0.951
+    }
+   }
+  },
+  "bid_-0.3": {
+   "games": 16000,
+   "avg_score": -0.0198,
+   "se": 0.0395,
+   "sec": 234.0,
+   "roles": {
+    "banker": {
+     "n": 3261,
+     "avg": 3.578
+    },
+    "xian": {
+     "n": 12739,
+     "avg": -0.941
+    },
+    "banker0": {
+     "n": 4000,
+     "avg": 2.852
+    },
+    "xian0": {
+     "n": 12000,
+     "avg": -0.951
+    }
+   }
+  },
+  "bid_-1.0": {
+   "games": 16000,
+   "avg_score": -0.1146,
+   "se": 0.0366,
+   "sec": 234.5,
+   "roles": {
+    "banker": {
+     "n": 2260,
+     "avg": 4.577
+    },
+    "xian": {
+     "n": 13740,
+     "avg": -0.886
+    },
+    "banker0": {
+     "n": 4000,
+     "avg": 2.852
+    },
+    "xian0": {
+     "n": 12000,
+     "avg": -0.951
+    }
+   }
+  },
+  "no_surrender": {
+   "games": 16000,
+   "avg_score": -0.0649,
+   "se": 0.0416,
+   "sec": 240.5,
+   "roles": {
+    "banker": {
+     "n": 4000,
+     "avg": 2.592
+    },
+    "xian": {
+     "n": 12000,
+     "avg": -0.951
+    },
+    "banker0": {
+     "n": 4000,
+     "avg": 2.852
+    },
+    "xian0": {
+     "n": 12000,
+     "avg": -0.951
+    }
+   }
+  },
+  "oracle_play": {
+   "games": 3200,
+   "avg_score": 1.8247,
+   "se": 0.0967,
+   "sec": 566.6,
+   "roles": {
+    "banker": {
+     "n": 800,
+     "avg": 7.016
+    },
+    "xian": {
+     "n": 2400,
+     "avg": 0.094
+    },
+    "banker0": {
+     "n": 800,
+     "avg": 2.606
+    },
+    "xian0": {
+     "n": 2400,
+     "avg": -0.869
+    }
+   }
+  },
+  "oracle_all": {
+   "games": 3200,
+   "avg_score": 2.0469,
+   "se": 0.1007,
+   "sec": 590.8,
+   "roles": {
+    "banker": {
+     "n": 800,
+     "avg": 7.905
+    },
+    "xian": {
+     "n": 2400,
+     "avg": 0.094
+    },
+    "banker0": {
+     "n": 800,
+     "avg": 2.606
+    },
+    "xian0": {
+     "n": 2400,
+     "avg": -0.869
+    }
+   }
+  }
+ }
+}

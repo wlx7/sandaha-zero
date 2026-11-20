@@ -21,6 +21,7 @@ export function mountPlay(app) {
   let timerInt = null;
   let resizeT = null;
   let resultT = null;
+  let actT = null;
 
   offs.push(on('rooms', (m) => {
     if (!alive) return;
@@ -43,6 +44,8 @@ export function mountPlay(app) {
     st.timeOffset = m.now - Date.now() / 1000;
     const prevPhase = st.view && st.view.phase;
     st.view = m;
+    st.pendingAct = false;
+    clearTimeout(actT);
     const sig = (m.hand || []).join(',') + '|' + m.phase + '|' + (m.hand_no || 0);
     if (sig !== st.handSig) { st.sel.clear(); st.handSig = sig; }
     // A new hand started (e.g. all-AI rooms continue on their own): drop the old settlement popup
@@ -55,6 +58,21 @@ export function mountPlay(app) {
     }
   }));
   offs.push(on('hint', (m) => { if (alive) showHint(m.comment); }));
+  // The server rejected something (e.g. an illegal play): give the buttons back
+  offs.push(on('error', () => { if (alive && st.pendingAct) { st.pendingAct = false; clearTimeout(actT); render(); } }));
+  // Heartbeat answer: if the table we show is not the server's current revision, fetch it again
+  offs.push(on('pong', (m) => {
+    if (!alive || !st.view || !st.view.room) return;
+    if (m.rev === null || m.rev === undefined) {
+      // The room no longer exists on the server (its "closed" notice never reached us): back to the lobby
+      st.view = null;
+      st.sel.clear();
+      render();
+      send({ op: 'list_rooms' });
+    } else if (m.rev !== st.view.rev) {
+      send({ op: 'sync' });
+    }
+  }));
   offs.push(on('welcome', () => { if (alive) send({ op: 'sync' }); }));
   offs.push(on('close', () => { /* reconnect handled by net */ }));
 
@@ -526,7 +544,7 @@ export function mountPlay(app) {
     wrap.append(h('div', { class: 'topbar' }, info, tools));
 
     // ---- felt
-    const felt = h('div', { class: 'felt' });
+    const felt = h('div', { class: 'felt' + (v.phase === 'bid' ? ' bidding' : '') });
     const seatsByRel = [0, 1, 2, 3].map((r) => (viewer() + r) % 4);
     felt.append(seatBox(seatsByRel[2], 'top'), seatBox(seatsByRel[3], 'left'), seatBox(seatsByRel[1], 'right'));
 
@@ -656,6 +674,23 @@ export function mountPlay(app) {
     return [...st.sel].map((k) => k.split('#')[0]);
   }
 
+  // Send one decision (叫分 / 定主 / 埋底 / 出牌). The buttons are locked until the server answers, so a
+  // double tap cannot send twice; if no answer comes back the table is re-synced instead of hanging.
+  function sendAction(payload) {
+    if (st.pendingAct) return;
+    st.pendingAct = true;
+    const box = $('.actions');
+    if (box) box.classList.add('busy');
+    send({ op: 'action', ...payload });
+    clearTimeout(actT);
+    actT = setTimeout(() => {
+      if (!alive || !st.pendingAct) return;
+      st.pendingAct = false;
+      send({ op: 'sync' });
+      render();
+    }, 2500);
+  }
+
   function updateSelInfo() {
     const el = $('[data-selinfo]');
     if (!el) return;
@@ -669,6 +704,7 @@ export function mountPlay(app) {
     const mine = v.my_seat !== null && v.my_seat !== undefined && v.to_act === v.my_seat;
     const compact = stage.compact;
     if (!v.phase) return;
+    if (st.pendingAct) box.classList.add('busy');
     if (v.phase === 'over') {
       box.append(h('span', { class: 'msg' }, `${v.result.tier} · 闲家 ${v.result.xian_points} 分`),
         h('button', { class: 'btn', onclick: showResult }, '结算详情'));
@@ -686,9 +722,17 @@ export function mountPlay(app) {
       // "不叫" first: on narrow screens the bar scrolls sideways and the pass button must never be off-screen
       const bids = [...(v.legal_bids || [])].sort((a, b) => (a === 0 ? -1 : b === 0 ? 1 : b - a));
       for (const b of bids) {
-        grid.append(h('button', { class: 'btn' + (b === 0 ? ' ghost' : ''), onclick: () => send({ op: 'action', kind: 'bid', value: b }) }, b === 0 ? '不叫' : `${b}`));
+        grid.append(h('button', { class: 'btn' + (b === 0 ? ' ghost' : ''), onclick: (e) => {
+          e.currentTarget.classList.add('picked');
+          sendAction({ kind: 'bid', value: b });
+        } }, b === 0 ? '不叫' : `${b}`));
       }
-      box.append(h('span', { class: 'msg' }, compact ? '叫分:' : '请叫分（越低越难）：'));
+      // No "不叫" among the legal bids = the 常主 rule forces this seat to bid: say so instead of just hiding the button
+      const forced = bids.length > 0 && !bids.includes(0);
+      box.classList.add('bidding');
+      if (box.parentElement) box.parentElement.classList.add('bidding');
+      box.append(h('span', { class: 'msg' }, forced ? (compact ? '常主≥7 须叫:' : '你有 7 张以上常主，这轮不能不叫，请叫分：')
+        : (compact ? '叫分:' : '请叫分（越低越难）：')));
       if (v.mode === 'teach') box.append(h('button', { class: 'btn sm', onclick: () => send({ op: 'hint' }) }, '提示'));
       box.append(grid);
     } else if (v.phase === 'trump') {
@@ -711,10 +755,10 @@ export function mountPlay(app) {
               h('div', { style: { margin: '8px 0 14px' } }, `当前庄分 ${v.contract} 分，投降将按「${v.contract >= 55 ? '下庄' : '小倒'}」直接结算本局。`),
               h('div', { class: 'row', style: { justifyContent: 'flex-end' } },
                 h('button', { class: 'btn ghost', onclick: () => m.close() }, '取消'),
-                h('button', { class: 'btn danger', onclick: () => { m.close(); send({ op: 'action', kind: 'trump', value: t }); } }, '确定投降'))));
+                h('button', { class: 'btn danger', onclick: () => { m.close(); sendAction({ kind: 'trump', value: t }); } }, '确定投降'))));
             return;
           }
-          send({ op: 'action', kind: 'trump', value: t });
+          sendAction({ kind: 'trump', value: t });
         } }, TRUMP_NAMES[t]));
       }
     } else if (v.phase === 'bury') {
@@ -724,7 +768,7 @@ export function mountPlay(app) {
         h('button', { class: 'btn primary', onclick: () => {
           const cards = selectedCodes();
           if (cards.length !== v.bury_need) { toast(`请选择 ${v.bury_need} 张牌`); return; }
-          send({ op: 'action', kind: 'bury', cards });
+          sendAction({ kind: 'bury', cards });
         } }, '埋底'),
         h('button', { class: 'btn', onclick: () => { st.sel.clear(); render(); } }, '重选')
       );
@@ -739,7 +783,7 @@ export function mountPlay(app) {
         h('button', { class: 'btn primary', onclick: () => {
           const cards = selectedCodes();
           if (!cards.length) { toast('请先选择要出的牌'); return; }
-          send({ op: 'action', kind: 'play', cards });
+          sendAction({ kind: 'play', cards });
         } }, '出牌'),
         h('button', { class: 'btn', onclick: () => { st.sel.clear(); render(); } }, '重选')
       );
@@ -955,6 +999,7 @@ export function mountPlay(app) {
     clearInterval(timerInt);
     clearTimeout(resizeT);
     clearTimeout(resultT);
+    clearTimeout(actT);
     window.removeEventListener('resize', onResize);
     window.removeEventListener('sdh-stage-resize', onResize);
   };

@@ -255,6 +255,12 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
     "pleft pme  pright";
   gap: 4px 8px; align-items: center; min-height: 0; position: relative; }
 .pslot { width: 100%; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; padding: 1px; }
+/* The trick area is display-only. When it is squeezed its (possibly empty) slots overflow onto the
+   control bar, and being a positioned box it sat on top of the buttons and swallowed their taps. */
+.center { pointer-events: none; }
+.center .mid { pointer-events: auto; }
+/* No cards are on the table while bidding: let the slots collapse so the bid buttons get the room */
+.felt.bidding .center { grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); }
 /* Each player's cards sit close to that player instead of bunching in the middle */
 .pslot.p-top { grid-area: ptop; align-self: start; }
 .pslot.p-left { grid-area: pleft; justify-content: flex-start; padding-left: 4px; }
@@ -292,6 +298,9 @@ details summary { cursor: pointer; color: var(--gold2); margin: 6px 0; }
 .hand { position: relative; width: 100%; max-width: 1120px; margin: 0 auto; flex: none; }
 .bid-grid { display: inline-flex; flex-wrap: wrap; gap: 5px; justify-content: center; max-width: 660px; }
 .bid-grid .btn { min-width: 46px; padding: 4px 10px; min-height: 32px; }
+.bid-grid .btn.picked { background: var(--gold); color: #1b1300; border-color: var(--gold2); }
+/* A decision was sent and the server has not answered yet: lock the buttons (no double sends) */
+.actions.busy { opacity: .6; pointer-events: none; }
 
 /* Side panel + backdrop */
 .side-backdrop { display: none; }
@@ -508,8 +517,12 @@ html.compact-landscape .buried-inline { display: none; }
 html.compact-landscape .actions { flex-wrap: nowrap; min-height: 26px; gap: 5px; }
 html.compact-landscape .actions .msg { font-size: .8rem; }
 html.compact-landscape .actions .btn { min-height: 26px; padding: 2px 9px; font-size: .8rem; border-radius: 8px; }
-html.compact-landscape .bid-grid { flex-wrap: nowrap; gap: 3px; max-width: none; }
-html.compact-landscape .bid-grid .btn { min-width: 32px; padding: 2px 5px; min-height: 25px; font-size: .78rem; }
+/* 叫分 on phones: up to 17 buttons. A single scrolling line hid the lowest bids and left 25px-high targets
+   that were easy to miss, so the grid wraps into rows of finger-sized buttons and nothing scrolls. */
+html.compact-landscape .control-bar.bidding { overflow-x: visible; align-items: center; }
+html.compact-landscape .actions.bidding { min-width: 0; }
+html.compact-landscape .bid-grid { flex-wrap: wrap; gap: 4px; justify-content: flex-start; max-width: min(428px, calc(var(--stage-w) - 250px)); }
+html.compact-landscape .bid-grid .btn { min-width: 44px; padding: 2px 6px; min-height: 30px; font-size: .86rem; }
 html.compact-landscape .chip { min-width: 24px; height: 20px; font-size: 11px; padding: 0 3px; }
 html.compact-landscape .chips { flex-wrap: nowrap; gap: 2px; }
 

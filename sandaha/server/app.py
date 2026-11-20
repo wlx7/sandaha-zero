@@ -304,8 +304,15 @@ async def handle(client: Client, msg: dict):
     room = hub.rooms.get(client.room_id) if client.room_id else None
     if op == "list_rooms":
         await client.send({"op": "rooms", "rooms": hub.room_list()})
+    elif op == "ping":
+        # Heartbeat: proves the socket is alive, revives a stalled hand, and tells the client
+        # which state revision it should be showing.
+        if room:
+            await room.kick()
+        await client.send({"op": "pong", "rev": room.rev if room else None})
     elif op == "sync":
         if room:
+            await room.kick()
             await client.send(room.view(client.id))
         else:
             await client.send({"op": "rooms", "rooms": hub.room_list()})

@@ -6,6 +6,7 @@ const outbox = [];
 let ws = null;
 let reconnectTimer = null;
 let retry = 0;
+let lastMsgAt = Date.now();
 
 export const me = {
   id: store.get('sdh.client_id', null),
@@ -52,6 +53,7 @@ export function connect() {
   sock.onopen = () => {
     if (ws !== sock) return;
     retry = 0;
+    lastMsgAt = Date.now();
     sock.send(JSON.stringify({ op: 'hello', client_id: me.id, name: me.name }));
     while (outbox.length && sock.readyState === WebSocket.OPEN) {
       sock.send(outbox.shift());
@@ -60,6 +62,7 @@ export function connect() {
   };
 
   sock.onmessage = (e) => {
+    lastMsgAt = Date.now();
     let msg;
     try {
       msg = JSON.parse(e.data);
@@ -95,10 +98,41 @@ export function send(obj) {
   connect();
 }
 
+// Drop a socket that looks open but no longer delivers anything, and reconnect right away.
+function restartSocket() {
+  const old = ws;
+  ws = null;
+  if (old) {
+    old.onopen = old.onmessage = old.onerror = old.onclose = null;
+    try { old.close(); } catch { /* ignore */ }
+  }
+  emit('close', {});
+  retry = 0;
+  connect();
+}
+
+// Heartbeat. A phone that slept, switched Wi-Fi or lost a packet can leave the socket "open" while
+// nothing arrives any more: the table then looks frozen. Ping every few seconds; the server answers
+// with the revision of the room state, so a missed update is noticed too (see game.js 'pong').
+const PING_MS = 4000;
+setInterval(() => {
+  if (document.hidden) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (Date.now() - lastMsgAt > PING_MS * 2.5) {
+    restartSocket();
+    return;
+  }
+  try { ws.send('{"op":"ping"}'); } catch { /* onclose will follow */ }
+}, PING_MS);
+
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && (!ws || ws.readyState > WebSocket.OPEN)) {
+  if (document.hidden) return;
+  lastMsgAt = Date.now();   // timers were throttled while hidden: do not count that as silence
+  if (!ws || ws.readyState > WebSocket.OPEN) {
     retry = 0;
     connect();
+  } else if (ws.readyState === WebSocket.OPEN) {
+    try { ws.send('{"op":"ping"}'); } catch { /* ignore */ }
   }
 });
 

@@ -5,10 +5,12 @@ import asyncio
 import copy
 import random
 import time
+import traceback
 import uuid
 
 from .. import moves as M
 from ..ai import AIAgent
+from ..bots import RuleBot
 from ..cards import CODE_TO_TYPE, NUM_TYPES, card_code, sort_key, trump_context
 from ..engine import (BID, BURY, BURY_COUNT, OVER, PASS, PLAY, SURRENDER, TRUMP, TRUMP_LABELS, Game,
                       IllegalMove, describe_action)
@@ -69,6 +71,7 @@ class Room:
         self.comments: list[dict] = []
         self.deadline = None
         self._task = None
+        self.rev = 0                # bumped on every broadcast; lets clients detect a missed update
         self._next_first = random.randrange(4)
         self.lock = asyncio.Lock()
         self.created = time.time()
@@ -220,26 +223,77 @@ class Room:
                 if seat.kind != "ai":
                     return
                 s = g.to_act
-                if g.phase == BURY:
-                    cards = []
-                    comment = self._comment(g, s, None) if self.mode == TEACH else None
-                    while g.phase == BURY:
+                try:
+                    if g.phase == BURY:
+                        cards = []
+                        comment = self._comment(g, s, None) if self.mode == TEACH else None
+                        while g.phase == BURY:
+                            a = await asyncio.to_thread(seat.agent.act, g)
+                            cards.append(a)
+                            g.step(a)
+                        if comment:
+                            comment["chosen"] = "埋 " + " ".join(describe_action(PLAY, (t,)) for t in cards)
+                            self.comments.append(comment)
+                    else:
                         a = await asyncio.to_thread(seat.agent.act, g)
-                        cards.append(a)
+                        if self.mode == TEACH:
+                            c = self._comment(g, s, a)
+                            if c:
+                                self.comments.append(c)
                         g.step(a)
-                    if comment:
-                        comment["chosen"] = "埋 " + " ".join(describe_action(PLAY, (t,)) for t in cards)
-                        self.comments.append(comment)
-                else:
-                    a = await asyncio.to_thread(seat.agent.act, g)
-                    if self.mode == TEACH:
-                        c = self._comment(g, s, a)
-                        if c:
-                            self.comments.append(c)
-                    g.step(a)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    # A failing model must not freeze the table: play a safe legal move instead.
+                    traceback.print_exc()
+                    self._force_move(g, s)
                 await self.advance()
         except asyncio.CancelledError:
             pass
+        except Exception:
+            traceback.print_exc()
+
+    @staticmethod
+    def _safe_action(g):
+        """A legal, conservative action for the seat to act (used when a player cannot decide)."""
+        acts = g.legal_actions()
+        if g.phase == BID:
+            # 不叫 when allowed; a forced bidder takes the highest (= easiest) contract still open
+            return PASS if PASS in acts else max(acts)
+        if g.phase == TRUMP and len(acts) > 1:
+            acts = [a for a in acts if a != SURRENDER]
+        try:
+            a = RuleBot(seed=0).act(g)
+            if a in acts:
+                return a
+        except Exception:
+            pass
+        return acts[0]
+
+    def _force_move(self, g, s):
+        """Make seat ``s`` complete its current decision (all remaining 埋底 cards, or one action)."""
+        if g.phase == BURY:
+            while not g.over and g.phase == BURY and g.to_act == s:
+                g.step(self._safe_action(g))
+        elif not g.over and g.to_act == s:
+            g.step(self._safe_action(g))
+
+    def stalled(self) -> bool:
+        """True when a hand is running but nothing is scheduled to move it forward."""
+        g = self.game
+        if g is None or g.over or self.status != "playing":
+            return False
+        if self._task is not None and not self._task.done():
+            return False
+        seat = self.seats[g.to_act]
+        return seat.kind == "ai" or (self.mode == BATTLE and self.turn_seconds > 0)
+
+    async def kick(self):
+        """Self-heal: re-arm the AI move / turn timer if it was lost for any reason."""
+        if self.stalled():
+            async with self.lock:
+                if self.stalled():
+                    await self.advance()
 
     async def _auto_next(self, hand_no):
         """All-AI rooms (spectating) continue on their own."""
@@ -259,21 +313,14 @@ class Room:
                 if g is None or g.over or self.deadline != deadline:
                     return
                 s = g.to_act
-                rng = random.Random()
-                if g.phase == BURY:
-                    while g.phase == BURY:
-                        g.step(rng.choice(g.legal_actions()))
-                else:
-                    acts = g.legal_actions()
-                    if g.phase == BID and PASS in acts:
-                        acts = [PASS]  # an expired bid counts as 不叫
-                    if g.phase == TRUMP and len(acts) > 1:
-                        acts = [a for a in acts if a != SURRENDER]
-                    g.step(rng.choice(acts))
+                # Time is up: 不叫 (or the easiest contract when forced to bid), otherwise a simple legal move
+                self._force_move(g, s)
                 g.events.append({"type": "timeout", "seat": s})
                 await self.advance()
         except asyncio.CancelledError:
             pass
+        except Exception:
+            traceback.print_exc()
 
     # ------------------------------------------------------- human input --
     async def human_action(self, client_id, msg):
@@ -400,7 +447,7 @@ class Room:
              "is_host": client_id == self.host_id, "can_manage": self.can_manage(client_id),
              "ai_delay": self.ai_delay, "totals": self.totals,
              "past_hands": [{k: v for k, v in h.items() if k != "tricks"} for h in self.past_hands],
-             "turn_seconds": self.turn_seconds, "now": time.time()}
+             "turn_seconds": self.turn_seconds, "now": time.time(), "rev": self.rev}
         if g is None:
             return d
         ctx = g.ctx
@@ -450,6 +497,7 @@ class Room:
         return d
 
     async def broadcast(self):
+        self.rev += 1
         for cid in list(self.members):
             c = self.hub.clients.get(cid)
             if c and c.ws is not None:

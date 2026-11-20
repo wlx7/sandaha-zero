@@ -1,6 +1,6 @@
 [project]
 name = "sandaha-zero"
-version = "2.3.3"
+version = "2.3.4"
 description = "三打哈 (Hunan San Da Ha) AI: deep Monte-Carlo self-play, web client with LAN play, teaching mode and training dashboard"
 readme = "README.md"
 license = { file = "LICENSE" }
