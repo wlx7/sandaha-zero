@@ -23,7 +23,7 @@ import uuid
 from .. import __version__
 from ..engine import IllegalMove
 from ..rules import Rules
-from . import registry
+from . import profiles, registry
 from .rooms import BATTLE, TEACH, Room, destroy_room
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
@@ -150,6 +150,7 @@ class Client:
         self.name = name
         self.ws: LiteWebSocket | None = None
         self.room_id = None
+        self.profile_id = None    # save slot this device plays as
         self.last_seen = time.time()
 
     async def send(self, obj):
@@ -280,6 +281,8 @@ async def handle(client: Client, msg: dict):
         for t in targets:
             await destroy_room(hub, t, client.id)
         await client.send({"op": "rooms", "rooms": hub.room_list()})
+    elif op.startswith("profile_"):
+        await profiles.handle_op(hub, client, msg)
     elif room is None:
         raise IllegalMove("你不在房间中")
     elif op == "leave_room":
@@ -378,6 +381,7 @@ async def _ws_session(ws: LiteWebSocket):
                     hub.clients[cid] = client
                 if msg.get("name"):
                     client.name = msg["name"][:16]
+                prof = profiles.on_hello(hub, client, msg)   # a profile name wins over the free-text name
                 if client.ws is not None and client.ws is not ws:
                     try:
                         await client.ws.close()
@@ -385,7 +389,7 @@ async def _ws_session(ws: LiteWebSocket):
                         pass
                 client.ws = ws
                 client.last_seen = time.time()
-                await client.send({"op": "welcome", "client_id": cid, "name": client.name})
+                await client.send({"op": "welcome", "client_id": cid, "name": client.name, "profile": prof})
                 room = hub.rooms.get(client.room_id) if client.room_id else None
                 if room:
                     for s in room.seats:

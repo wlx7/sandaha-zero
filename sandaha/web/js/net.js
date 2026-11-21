@@ -11,7 +11,21 @@ let lastMsgAt = Date.now();
 export const me = {
   id: store.get('sdh.client_id', null),
   name: store.get('sdh.name', '玩家' + Math.floor(Math.random() * 900 + 100)),
+  profileId: store.get('sdh.profile', null),  // save slot this device last played as
+  profile: null,                               // its summary, once the server confirmed it
+  welcomed: false,                             // the server has told us whether a profile is active
 };
+
+function hello() {
+  return JSON.stringify({ op: 'hello', client_id: me.id, name: me.name, profile_id: me.profileId });
+}
+
+function setProfile(p) {
+  me.profile = p || null;
+  me.profileId = p ? p.id : null;
+  store.set('sdh.profile', me.profileId);
+  if (p) me.name = p.name;
+}
 
 export function on(op, fn) {
   (listeners[op] ||= new Set()).add(fn);
@@ -27,7 +41,7 @@ export function setName(n) {
   me.name = (n || '').trim().slice(0, 16) || me.name;
   store.set('sdh.name', me.name);
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ op: 'hello', client_id: me.id, name: me.name }));
+    ws.send(hello());
   }
 }
 
@@ -54,7 +68,7 @@ export function connect() {
     if (ws !== sock) return;
     retry = 0;
     lastMsgAt = Date.now();
-    sock.send(JSON.stringify({ op: 'hello', client_id: me.id, name: me.name }));
+    sock.send(hello());
     while (outbox.length && sock.readyState === WebSocket.OPEN) {
       sock.send(outbox.shift());
     }
@@ -72,6 +86,14 @@ export function connect() {
     if (msg.op === 'welcome') {
       me.id = msg.client_id;
       store.set('sdh.client_id', me.id);
+      setProfile(msg.profile);
+      me.welcomed = true;
+    }
+    if (msg.op === 'profile') setProfile(msg.profile);
+    if (msg.op === 'profiles' && me.profile) {
+      // keep the summary (name, stats) of the active profile fresh
+      const cur = (msg.profiles || []).find((p) => p.id === me.profileId);
+      if (cur) setProfile(cur);
     }
     if (msg.op === 'error') toast(msg.msg);
     emit(msg.op, msg);

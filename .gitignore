@@ -27,3 +27,6 @@ android/local.properties
 signing/
 *.jks
 *.p12
+
+# Player save slots (created at runtime)
+data/

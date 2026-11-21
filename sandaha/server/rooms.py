@@ -15,7 +15,7 @@ from ..cards import CODE_TO_TYPE, NUM_TYPES, card_code, sort_key, trump_context
 from ..engine import (BID, BURY, BURY_COUNT, OVER, PASS, PLAY, SURRENDER, TRUMP, TRUMP_LABELS, Game,
                       IllegalMove, describe_action)
 from ..rules import Rules
-from . import registry
+from . import profiles, registry
 
 BATTLE, TEACH = "battle", "teach"
 TURN_SECONDS = 30
@@ -211,6 +211,22 @@ class Room:
         self.past_hands = self.past_hands[-30:]
         b = r["banker"]
         self._next_first = b if not r["xian_win"] else (b + 1) % 4
+        self._record_profiles(r)
+
+    def _record_profiles(self, r):
+        """Add the finished hand to the save slot of every human seat that has one."""
+        for i, seat in enumerate(self.seats):
+            if seat.kind != "human":
+                continue
+            c = self.hub.clients.get(seat.client_id)
+            pid = getattr(c, "profile_id", None)
+            if not pid:
+                continue
+            try:
+                profiles.record_hand(pid, self.mode, r["scores"][i], r["banker"] == i, r["contract"],
+                                     r["tier"], r["xian_points"], room=self.name, hand_no=self.hand_no)
+            except Exception:  # a full disk must not break the game
+                traceback.print_exc()
 
     async def _ai_turn(self):
         try:

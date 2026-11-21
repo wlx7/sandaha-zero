@@ -3,6 +3,7 @@ import { $, api, fmt, h, modal, pct, stage, store, toast, tryLandscapeFullscreen
 import { cardEl, chipEl, label, layoutHand, SUIT_SYM } from './cards.js';
 import { me, on, send } from './net.js';
 import { fullscreenBtn, goHome, showRules } from './main.js';
+import { openProfilePicker, showProfileStats } from './profiles.js';
 
 const TRUMP_NAMES = ['♠ 黑桃', '♥ 红桃', '♣ 梅花', '♦ 方块', '无主', '投降'];
 const PHASE_NAMES = { bid: '叫分', trump: '定主', bury: '埋底', play: '出牌', over: '结束' };
@@ -58,6 +59,8 @@ export function mountPlay(app) {
     }
   }));
   offs.push(on('hint', (m) => { if (alive) showHint(m.comment); }));
+  // The lobby shows who is playing: redraw it when the user changes
+  offs.push(on('profile', () => { if (alive && (!st.view || !st.view.room)) render(); }));
   // The server rejected something (e.g. an illegal play): give the buttons back
   offs.push(on('error', () => { if (alive && st.pendingAct) { st.pendingAct = false; clearTimeout(actT); render(); } }));
   // Heartbeat answer: if the table we show is not the server's current revision, fetch it again
@@ -350,7 +353,8 @@ export function mountPlay(app) {
     const closableCount = st.rooms.filter(canManageRoomSummary).length;
     app.append(h('div', { class: 'page lobby-page' },
       h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => goHome() }, '← 首页'),
-        h('h2', {}, '对弈大厅'), h('span', { class: 'hint' }, `昵称：${me.name}`),
+        h('h2', {}, '对弈大厅'), h('span', { class: 'hint' }, `用户：${me.name}`),
+        h('button', { class: 'btn sm ghost', onclick: () => openProfilePicker() }, '切换'),
         fullscreenBtn(() => render()),
         h('button', { class: 'btn sm ghost', onclick: showRules }, '规则')),
       h('div', { class: 'grid2 lobby-grid' },
@@ -957,7 +961,9 @@ export function mountPlay(app) {
       h('div', { class: 'score-grid' }, [0, 1, 2, 3].map((i) => h('div', {}, seatName(i) + (i === r.banker ? '（庄）' : ''),
         h('b', { class: r.scores[i] >= 0 ? 'pos' : 'neg' }, `${r.scores[i] >= 0 ? '+' : ''}${r.scores[i]}`),
         h('span', { class: 'hint' }, `累计 ${v.totals[i]}`)))),
-      v.buried ? h('div', {}, h('div', { class: 'hint' }, '底牌'), h('div', { class: 'chips' }, v.buried.map((c) => chipEl(c, v.trump)))) : null);
+      v.buried ? h('div', {}, h('div', { class: 'hint' }, '底牌'), h('div', { class: 'chips' }, v.buried.map((c) => chipEl(c, v.trump)))) : null,
+      my !== null && my !== undefined && me.profile ? h('div', { class: 'hint', style: { textAlign: 'center', marginTop: '6px' } },
+        `本局已计入「${me.profile.name}」的战绩 `, h('a', { href: '#', onclick: (e) => { e.preventDefault(); showProfileStats(me.profile.id); } }, '查看')) : null);
     const m = modal(h('div', {}, content, h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '10px' } },
       (v.can_manage || v.is_host) ? h('button', { class: 'btn danger', onclick: () => {
         m.close();

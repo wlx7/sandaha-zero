@@ -43,7 +43,8 @@ export function modal(content, { onClose, closable = true } = {}) {
   const box = h('div', { class: 'modal', role: 'dialog' }, content);
   back.append(box);
   const close = () => { back.remove(); onClose && onClose(); };
-  if (closable) back.addEventListener('click', (e) => { if (e.target === back) close(); });
+  // A locked popup (data-locked) must be answered: the backdrop does not close it
+  if (closable) back.addEventListener('click', (e) => { if (e.target === back && !back.dataset.locked) close(); });
   root.append(back);
   return { close, box };
 }
