@@ -1,7 +1,7 @@
 import { $, api, canBrowserFullscreen, h, initStage, isFullscreenActive, modal, stage, store, tryLandscapeFullscreen } from './util.js';
 import { connect, me, on, send, setName } from './net.js';
 import { mountPlay } from './game.js';
-import { ensureProfile, openProfilePicker, profileLine, profileModalLocked, showProfileStats } from './profiles.js';
+import { askName, ensureProfile, openProfilePicker, profileLine, profileModalLocked, showProfileStats } from './profiles.js';
 
 const ICON_PLAY = `<svg viewBox="0 0 64 64" fill="none"><rect x="8" y="14" width="26" height="36" rx="4" fill="#fffdf8" stroke="#e3b341" stroke-width="2" transform="rotate(-10 21 32)"/><text x="12" y="30" font-size="12" font-weight="800" fill="#c62828" transform="rotate(-10 21 32)">K</text><rect x="28" y="12" width="26" height="36" rx="4" fill="#fffdf8" stroke="#e3b341" stroke-width="2" transform="rotate(10 41 30)"/><text x="33" y="27" font-size="12" font-weight="800" fill="#1a1a1a" transform="rotate(10 41 30)">A</text><text x="38" y="42" font-size="14" fill="#1a1a1a" transform="rotate(10 41 30)">♠</text></svg>`;
 const ICON_TEACH = `<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="26" r="14" fill="#13342a" stroke="#e3b341" stroke-width="2.5"/><path d="M26 40h12v6a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4v-6z" fill="#234b3d" stroke="#e3b341" stroke-width="2"/><path d="M32 18v10M27 24h10" stroke="#f5d77a" stroke-width="2.5" stroke-linecap="round"/><path d="M28 54h8" stroke="#9fbcb0" stroke-width="2.5" stroke-linecap="round"/></svg>`;
@@ -142,16 +142,7 @@ function userBox() {
   const p = me.profile;
   const box = h('div', { class: 'userbox', 'data-userbox': 1 });
   if (!p && me.guest) {
-    const rename = () => {
-      const input = h('input', { value: me.name, maxlength: 12, style: { width: '100%' } });
-      const ok = () => { const v = input.value.trim(); if (!v) return; m.close(); setName(v); refreshUserBox(); };
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); });
-      const m = modal(h('div', {}, h('h2', {}, '游客昵称'), input,
-        h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } },
-          h('button', { class: 'btn ghost', onclick: () => m.close() }, '取消'),
-          h('button', { class: 'btn primary', onclick: ok }, '确定'))));
-      setTimeout(() => input.focus(), 30);
-    };
+    const rename = () => askName('游客昵称', me.name, (v) => { setName(v); refreshUserBox(); });
     box.append(
       h('span', { class: 'pp-av guest' }, '客'),
       h('div', { class: 'ub-text' },

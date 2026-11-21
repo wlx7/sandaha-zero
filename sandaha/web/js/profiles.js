@@ -29,8 +29,10 @@ function lock(m) {
   if (back) back.dataset.locked = '1';
 }
 
-function askName(title, value, onOk, note) {
-  const input = h('input', { value: value || '', maxlength: 12, placeholder: '最多 12 个字', style: { width: '100%' } });
+// One-line name prompt. On a landscape phone the keyboard leaves ~120px of height, so the input and
+// both buttons share one row (and the note sits next to the title) to keep 确定 visible.
+export function askName(title, value, onOk, note) {
+  const input = h('input', { value: value || '', maxlength: 12, placeholder: '最多 12 个字', enterkeyhint: 'done', autocomplete: 'off' });
   const ok = () => {
     const v = input.value.trim();
     if (!v) { toast('请输入用户名'); input.focus(); return; }
@@ -39,10 +41,9 @@ function askName(title, value, onOk, note) {
   };
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); });
   const m = modal(h('div', { class: 'name-ask' },
-    h('h2', {}, title),
-    note ? h('div', { class: 'hint', style: { marginBottom: '8px' } }, note) : null,
-    input,
-    h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } },
+    h('h2', {}, title, note ? h('span', { class: 'hint note' }, note) : null),
+    h('div', { class: 'name-row' },
+      input,
       h('button', { class: 'btn ghost', onclick: () => m.close() }, '取消'),
       h('button', { class: 'btn primary', onclick: ok }, '确定'))));
   setTimeout(() => { input.focus(); input.select(); }, 30);

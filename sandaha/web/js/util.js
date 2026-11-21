@@ -95,6 +95,8 @@ export function syncStage() {
   const sh = rotated ? rawW : rawH;
   const compact = sh <= 540;
   const narrow = sw <= 1000;
+  // Very little height left: on a landscape phone this means the on-screen keyboard is open
+  const short = sh <= 300;
 
   const changed = stage.rotated !== rotated || stage.width !== sw || stage.height !== sh;
   stage.width = sw;
@@ -107,6 +109,7 @@ export function syncStage() {
   root.classList.toggle('rotated-landscape', rotated);
   root.classList.toggle('compact-landscape', compact);
   root.classList.toggle('narrow-stage', narrow);
+  root.classList.toggle('short-stage', short);
   root.style.setProperty('--stage-w', `${sw}px`);
   root.style.setProperty('--stage-h', `${sh}px`);
   root.style.setProperty('--stage-left', `${offX}px`);
