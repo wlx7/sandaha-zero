@@ -157,6 +157,7 @@ h1, h2, h3 { margin: 0; font-weight: 700; }
 .pp-row .pp-main b { display: flex; gap: 6px; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pp-row .pp-when { flex: none; font-size: .76rem; }
 .pp-new { border-style: dashed; }
+.pp-av.guest { border-color: var(--muted); color: var(--muted); }
 .pp-new .pp-av { border-style: dashed; background: transparent; }
 .tag.warn { background: #5a2a1c; color: #ffd2c2; }
 .pp-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 12px; }

@@ -142,3 +142,53 @@ def test_finished_hand_is_recorded_for_human_seats():
         assert d["recent"][0]["banker"] == (room.game.result["banker"] == 0)
 
     asyncio.run(run())
+
+
+def test_guest_mode_saves_nothing():
+    async def run():
+        a = _Client("a")
+        hub = _Hub(a)
+        pid = profiles.create("甲")["id"]
+        profiles.bind(hub, a, pid)
+        await profiles.handle_op(hub, a, {"op": "profile_guest", "name": "过路人"})
+        assert a.profile_id is None and a.name == "过路人"
+        assert a.sent[-1] == {"op": "profile", "profile": None, "guest": True, "name": "过路人"}
+        with pytest.raises(IllegalMove):
+            await profiles.handle_op(hub, a, {"op": "profile_guest", "name": " "})
+        # a guest device reconnecting stays a guest even if it still remembers a profile
+        assert profiles.on_hello(hub, a, {"guest": True, "profile_id": pid}) is None and a.profile_id is None
+
+        seats = [{"kind": "human", "client_id": "a"}] + [{"kind": "ai", "model": "rule"}] * 3
+        room = Room(hub, "a", "t", BATTLE, seats, None, None, 0.0, 1)
+        room.members.add("a")
+        async with room.lock:
+            await room.start_hand()
+        t0 = time.time()
+        while not room.game.over:
+            assert time.time() - t0 < 120
+            await asyncio.sleep(0.02)
+        room.cancel()
+        assert room.totals[0] == room.game.result["scores"][0]     # the table keeps the score...
+        assert profiles.detail(pid)["stats"]["battle"]["hands"] == 0   # ...the save slot does not
+
+    asyncio.run(run())
+
+
+def test_guest_switch_refused_mid_hand():
+    async def run():
+        a = _Client("a")
+        hub = _Hub(a)
+        pid = profiles.create("甲")["id"]
+        profiles.bind(hub, a, pid)
+        seats = [{"kind": "human", "client_id": "a"}] + [{"kind": "ai", "model": "rule"}] * 3
+        room = Room(hub, "a", "t", BATTLE, seats, None, None, 0.0, 30)
+        hub.rooms[room.id] = room
+        a.room_id = room.id
+        async with room.lock:
+            await room.start_hand()
+        with pytest.raises(IllegalMove):
+            await profiles.handle_op(hub, a, {"op": "profile_guest", "name": "x"})
+        assert profiles.on_hello(hub, a, {"guest": True})["id"] == pid     # keeps recording this hand
+        room.cancel()
+
+    asyncio.run(run())

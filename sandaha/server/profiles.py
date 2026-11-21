@@ -5,7 +5,8 @@ for the APK), in ``<root>/data/profiles.json``. LAN guests pick or create a prof
 so the host keeps everybody's record. One profile can be used by one connected device at a time.
 
 Every finished hand of a human seat that has a profile is recorded: the stats per mode (对战 /
-教学) and the most recent hands.
+教学) and the most recent hands. A guest (游客) plays under a free-text name without a profile:
+nothing is saved, the score only lives in the room's running total.
 """
 from __future__ import annotations
 
@@ -249,6 +250,15 @@ def bind(hub, client, pid) -> dict:
 def on_hello(hub, client, msg) -> dict | None:
     """Restore the profile a reconnecting device remembers (silently dropped when unavailable)."""
     current = getattr(client, "profile_id", None)
+    if msg.get("guest"):
+        # This device chose 游客模式: drop the profile, unless it is in the middle of a recorded hand
+        if current and _seated_in_running_hand(hub, client):
+            prof = summary(current)
+            if prof:
+                client.name = prof["name"]
+                return prof
+        client.profile_id = None
+        return None
     pid = msg.get("profile_id") or current
     if not pid:
         return None
@@ -282,7 +292,7 @@ async def _refresh_rooms(hub, rooms):
 
 
 async def handle_op(hub, client, msg):
-    """WebSocket ops: profile_list / _create / _select / _rename / _delete / _get."""
+    """WebSocket ops: profile_list / _create / _select / _guest / _rename / _delete / _get."""
     op = msg["op"]
     if op == "profile_list":
         await client.send(_list_msg(hub, client))
@@ -295,6 +305,15 @@ async def handle_op(hub, client, msg):
         bind(hub, client, prof["id"])
         await client.send({"op": "profile", "profile": prof})
         await client.send(_list_msg(hub, client))
+        await _refresh_rooms(hub, _apply_name(hub, client))
+    elif op == "profile_guest":
+        # 游客模式: play under a free-text name, nothing is saved
+        name = clean_name(msg.get("name"))
+        if getattr(client, "profile_id", None) and _seated_in_running_hand(hub, client):
+            raise IllegalMove("对局进行中不能切换用户")
+        client.profile_id = None
+        client.name = name
+        await client.send({"op": "profile", "profile": None, "guest": True, "name": name})
         await _refresh_rooms(hub, _apply_name(hub, client))
     elif op == "profile_select":
         prof = bind(hub, client, msg.get("id"))

@@ -29,7 +29,7 @@ function lock(m) {
   if (back) back.dataset.locked = '1';
 }
 
-function askName(title, value, onOk) {
+function askName(title, value, onOk, note) {
   const input = h('input', { value: value || '', maxlength: 12, placeholder: '最多 12 个字', style: { width: '100%' } });
   const ok = () => {
     const v = input.value.trim();
@@ -40,6 +40,7 @@ function askName(title, value, onOk) {
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); });
   const m = modal(h('div', { class: 'name-ask' },
     h('h2', {}, title),
+    note ? h('div', { class: 'hint', style: { marginBottom: '8px' } }, note) : null,
     input,
     h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } },
       h('button', { class: 'btn ghost', onclick: () => m.close() }, '取消'),
@@ -59,6 +60,7 @@ export function openProfilePicker({ force = false, onDone } = {}) {
     if (force) picker.requireChoice();
     return;
   }
+  if (force && me.guest) return;   // a guest has deliberately chosen not to have a user
   const st = { list: null, inUse: {}, sel: me.profileId, pending: false, force };
   const body = h('div', { class: 'pp-body' });
   const offs = [];
@@ -74,6 +76,13 @@ export function openProfilePicker({ force = false, onDone } = {}) {
 
   function close() {
     m.close();
+  }
+
+  function playAsGuest() {
+    askName('游客模式', me.guest || !me.profile ? me.name : '', (name) => {
+      st.pending = true;
+      send({ op: 'profile_guest', name });
+    }, '游客不保存战绩，牌局结束后分数就没了。');
   }
 
   function choose(id) {
@@ -93,7 +102,9 @@ export function openProfilePicker({ force = false, onDone } = {}) {
       body.append(
         h('div', { class: 'pp-empty' }, '欢迎！先给自己起个名字吧，战绩都会记在这个名字下。'),
         h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '12px' } },
-          h('button', { class: 'btn primary', onclick: create }, '新建用户')));
+          h('button', { class: 'btn ghost', onclick: playAsGuest }, '游客模式'),
+          h('button', { class: 'btn primary', onclick: create }, '新建用户')),
+        h('div', { class: 'hint', style: { textAlign: 'center', marginTop: '8px' } }, '游客模式不保存战绩，牌局结束后分数就没了。'));
       return;
     }
     const list = h('div', { class: 'pp-list', role: 'listbox' });
@@ -124,6 +135,7 @@ export function openProfilePicker({ force = false, onDone } = {}) {
           h('button', { class: 'btn sm', disabled: !canAct, onclick: () => selected && rename(selected) }, '改名'),
           h('button', { class: 'btn sm danger', disabled: !canAct || Boolean(selected && st.inUse[selected.id]), onclick: () => selected && remove(selected) }, '删除')),
         h('div', { class: 'row' },
+          h('button', { class: 'btn ghost', onclick: playAsGuest, title: '不保存战绩' }, me.guest ? '继续当游客' : '游客模式'),
           st.force ? null : h('button', { class: 'btn ghost', onclick: close }, '取消'),
           h('button', { class: 'btn primary', disabled: !canAct || st.pending, onclick: () => choose(st.sel) },
             selected && selected.id === me.profileId ? '继续' : '就是我'))));
@@ -161,6 +173,12 @@ export function openProfilePicker({ force = false, onDone } = {}) {
     render();
   }));
   offs.push(on('profile', (msg) => {
+    if (msg.guest && st.pending) {
+      st.pending = false;
+      toast(`游客 ${msg.name}，祝你好运！`);
+      close();
+      return;
+    }
     if (msg.profile && st.pending) {
       st.pending = false;
       toast(`你好，${msg.profile.name}！`);
@@ -178,7 +196,7 @@ export function openProfilePicker({ force = false, onDone } = {}) {
 
 /** Open the picker whenever the server says this device has no active user. */
 export function ensureProfile(onDone) {
-  if (me.welcomed && !me.profile) openProfilePicker({ force: true, onDone });
+  if (me.welcomed && !me.profile && !me.guest) openProfilePicker({ force: true, onDone });
 }
 
 export function showProfileStats(id) {

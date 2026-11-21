@@ -12,15 +12,26 @@ export const me = {
   id: store.get('sdh.client_id', null),
   name: store.get('sdh.name', '玩家' + Math.floor(Math.random() * 900 + 100)),
   profileId: store.get('sdh.profile', null),  // save slot this device last played as
+  guest: store.get('sdh.guest', false),        // 游客模式: free-text name, nothing is saved
   profile: null,                               // its summary, once the server confirmed it
   welcomed: false,                             // the server has told us whether a profile is active
 };
 
 function hello() {
-  return JSON.stringify({ op: 'hello', client_id: me.id, name: me.name, profile_id: me.profileId });
+  return JSON.stringify({ op: 'hello', client_id: me.id, name: me.name, profile_id: me.guest ? null : me.profileId, guest: me.guest });
+}
+
+function setGuest(on, name) {
+  me.guest = Boolean(on);
+  store.set('sdh.guest', me.guest);
+  if (on && name) {
+    me.name = name;
+    store.set('sdh.name', name);
+  }
 }
 
 function setProfile(p) {
+  if (p) setGuest(false);
   me.profile = p || null;
   me.profileId = p ? p.id : null;
   store.set('sdh.profile', me.profileId);
@@ -89,7 +100,10 @@ export function connect() {
       setProfile(msg.profile);
       me.welcomed = true;
     }
-    if (msg.op === 'profile') setProfile(msg.profile);
+    if (msg.op === 'profile') {
+      setProfile(msg.profile);
+      if (msg.guest) setGuest(true, msg.name);
+    }
     if (msg.op === 'profiles' && me.profile) {
       // keep the summary (name, stats) of the active profile fresh
       const cur = (msg.profiles || []).find((p) => p.id === me.profileId);

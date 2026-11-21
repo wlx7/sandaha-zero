@@ -66,7 +66,7 @@ Each row is **2,992 duplicate deals × seat swap = 5,984 games**:
 | **Previous release v1.0 `medium` (53.7M games)** | **49.5% ± 1.3** | **−0.03** | 49.0% | 49.6% |
 | Old lightweight v1.0 `small` (405k games) | **61.6% ± 1.2** | **+0.89** | 51.7% | 61.4% |
 
-- **Player profiles**: a "who is playing?" picker on first launch; create, rename or delete users. Every finished hand is added to the active user's record (hands, win rate, total score, banker win rate, longest streak, last 40 hands). Profiles live on the machine that runs the server (`data/profiles.json` next to the EXE); LAN guests pick from the host's list, and one profile can be used by one device at a time.
+- **Player profiles**: a "who is playing?" picker on first launch; create, rename or delete users. Every finished hand is added to the active user's record (hands, win rate, total score, banker win rate, longest streak, last 40 hands). Profiles live on the machine that runs the server (`data/profiles.json` next to the EXE); LAN guests pick from the host's list, and one profile can be used by one device at a time. **Guest mode** plays under a nickname only: nothing is saved, the score lives on the table until the game ends.
 - **Optional Search (`?search`)**: over 1,600 duplicate games against plain v2.0 `sandaha-best`, belief-weighted batched rollout search (`sandaha-best?search`) scores **49.9% ± 2.4** (**−0.04** base stakes/game).
 
 ## Layout

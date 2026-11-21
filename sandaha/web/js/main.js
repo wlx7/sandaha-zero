@@ -1,5 +1,5 @@
 import { $, api, canBrowserFullscreen, h, initStage, isFullscreenActive, modal, stage, store, tryLandscapeFullscreen } from './util.js';
-import { connect, me, on, send } from './net.js';
+import { connect, me, on, send, setName } from './net.js';
 import { mountPlay } from './game.js';
 import { ensureProfile, openProfilePicker, profileLine, profileModalLocked, showProfileStats } from './profiles.js';
 
@@ -141,9 +141,29 @@ async function home(app, isAlive) {
 function userBox() {
   const p = me.profile;
   const box = h('div', { class: 'userbox', 'data-userbox': 1 });
+  if (!p && me.guest) {
+    const rename = () => {
+      const input = h('input', { value: me.name, maxlength: 12, style: { width: '100%' } });
+      const ok = () => { const v = input.value.trim(); if (!v) return; m.close(); setName(v); refreshUserBox(); };
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); });
+      const m = modal(h('div', {}, h('h2', {}, '游客昵称'), input,
+        h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } },
+          h('button', { class: 'btn ghost', onclick: () => m.close() }, '取消'),
+          h('button', { class: 'btn primary', onclick: ok }, '确定'))));
+      setTimeout(() => input.focus(), 30);
+    };
+    box.append(
+      h('span', { class: 'pp-av guest' }, '客'),
+      h('div', { class: 'ub-text' },
+        h('div', {}, '游客 ', h('b', {}, me.name)),
+        h('div', { class: 'hint' }, '不保存战绩，牌局结束后分数就没了')),
+      h('button', { class: 'btn sm ghost', onclick: rename }, '改昵称'),
+      h('button', { class: 'btn sm', onclick: () => openProfilePicker() }, '登录用户'));
+    return box;
+  }
   if (!p) {
-    box.append(h('span', { class: 'hint' }, me.welcomed ? '还没有选择用户' : '正在连接…'),
-      me.welcomed ? h('button', { class: 'btn sm primary', onclick: () => openProfilePicker({ force: true }) }, '选择用户') : null);
+    box.append(h('span', { class: 'hint' }, me.welcomed ? '还没有选择用户' : '正在连接…'));
+    if (me.welcomed) box.append(h('button', { class: 'btn sm primary', onclick: () => openProfilePicker({ force: true }) }, '选择用户'));
     return box;
   }
   box.append(

@@ -353,7 +353,7 @@ export function mountPlay(app) {
     const closableCount = st.rooms.filter(canManageRoomSummary).length;
     app.append(h('div', { class: 'page lobby-page' },
       h('div', { class: 'pagebar' }, h('button', { class: 'btn sm ghost', onclick: () => goHome() }, '← 首页'),
-        h('h2', {}, '对弈大厅'), h('span', { class: 'hint' }, `用户：${me.name}`),
+        h('h2', {}, '对弈大厅'), h('span', { class: 'hint' }, me.guest && !me.profile ? `游客：${me.name}` : `用户：${me.name}`),
         h('button', { class: 'btn sm ghost', onclick: () => openProfilePicker() }, '切换'),
         fullscreenBtn(() => render()),
         h('button', { class: 'btn sm ghost', onclick: showRules }, '规则')),
@@ -963,7 +963,8 @@ export function mountPlay(app) {
         h('span', { class: 'hint' }, `累计 ${v.totals[i]}`)))),
       v.buried ? h('div', {}, h('div', { class: 'hint' }, '底牌'), h('div', { class: 'chips' }, v.buried.map((c) => chipEl(c, v.trump)))) : null,
       my !== null && my !== undefined && me.profile ? h('div', { class: 'hint', style: { textAlign: 'center', marginTop: '6px' } },
-        `本局已计入「${me.profile.name}」的战绩 `, h('a', { href: '#', onclick: (e) => { e.preventDefault(); showProfileStats(me.profile.id); } }, '查看')) : null);
+        `本局已计入「${me.profile.name}」的战绩 `, h('a', { href: '#', onclick: (e) => { e.preventDefault(); showProfileStats(me.profile.id); } }, '查看'))
+        : my !== null && my !== undefined ? h('div', { class: 'hint', style: { textAlign: 'center', marginTop: '6px' } }, '游客模式：分数只保留到牌局结束') : null);
     const m = modal(h('div', {}, content, h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '10px' } },
       (v.can_manage || v.is_host) ? h('button', { class: 'btn danger', onclick: () => {
         m.close();
